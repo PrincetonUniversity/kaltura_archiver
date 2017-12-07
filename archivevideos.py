@@ -1,5 +1,6 @@
 import urllib
 import os
+import math
 import boto3
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
@@ -15,6 +16,12 @@ flavorsdeletedtag = "flavors_deleted"
 years2archive = 3
 # The tag that will be applied to videos that have been archived in S3
 archivedtag = "archived_to_S3"
+
+# Directory to use for downloading videos from Kaltura
+downloaddir = /tmp
+# Name of S3 Glacier bucket
+s3bucketname = "kalturavids"
+
 
 # Kaltura KMC connection information, pulled from environment variables
 partnerId = os.getenv("KALTURA_PARTNERID")
@@ -96,7 +103,10 @@ def deleteFlavors(entrylist):
 
             # But if there is a source video, then delete all other flavors
             else:
+              # Delete the flavors
               _deleteEntryFlavors(entry)
+              # Tag the video so that we know that this script deleted the flavors
+              _addTag(entry, flavorsdeletedtag)
 
             nid = nid + 1
 
@@ -108,11 +118,8 @@ def _deleteEntryFlavors(entry):
 
           for flavorassetwparams in flavorassetswparamslist:
             flavorasset = flavorassetwparams.getFlavorAsset()
-            if flavorasset == None:
-              print ("This flavorasset is null!")
-
-            elif (not flavorasset.getIsOriginal()):
-              print ("Deleting flavor: %s" % (flavorasset.id))
+            if (flavorasset != None and not flavorasset.getIsOriginal()):
+              print ("Deleting flavor: %s from entry: %s" % (flavorasset.id, entry.id))
               #client.flavorAsset.delete(flavorasset.id)
 
 
@@ -122,65 +129,112 @@ def _getSourceFlavor(entry):
           for flavorassetwparams in flavorassetswparamslist:
             #print(type(flavorassetwparams).__name__)
             flavorasset = flavorassetwparams.getFlavorAsset()
-            if flavorasset == None:
-              print ("This flavorasset is null!")
 
-            elif flavorasset.getIsOriginal():
-              #print ("flavorasset id = %s" %(flavorasset.id))
-              #extension = flavorasset.getFileExt()
-              #src_id = flavorasset.id
-              #src_url = client.flavorAsset.getUrl(src_id)
+            if ( flavorasset != None and flavorasset.getIsOriginal()):
               return flavorasset
-            else:
-              #print ("flavorasset id = %s" %(flavorasset.id))
-              flavor_ids.append(flavorasset.id)
 
-          else:
-            return None
+          # If the original wasn't found
+          return None
+
+def _addTag(entry, newtag):
+        mediaEntry = KalturaMediaEntry()
+        mediaEntry.tags = entry.tags + ", " + flavorsdeletedtag
+        client.media.update(entry.id, mediaEntry)
 
 
 def archiveFlavors(entrylist):
-          return true
 
-#          entry_id = "1_i1z6di04"
-#          src_id = ""
-#          flavor_id = ""
-#          flavorassetswparamslist = client.flavorAsset.getFlavorAssetsWithParams(entry_id)
-#          print(type(flavorassetswparamslist).__name__)
+        s3 = boto3.resource('s3')
 
-# TODO:
-# Delete flavors EXCEPT for source 
-# client.flavorAsset.delete(flavorasset.id)
+        # Get the total number of videos
+        totalcount = entrylist.totalCount
 
-#          for flavorassetwparams in flavorassetswparamslist:
-#            print(type(flavorassetwparams).__name__)
-#            flavorasset = flavorassetwparams.getFlavorAsset()
-#            if flavorasset.getIsOriginal():
-#              print(type(flavorasset).__name__)
-#              print(flavorasset.id)            
-#              src_id = flavorasset.id
-#              break
+        # Loop over the videos
+        nid = 1
+        while nid < totalcount :
+        #while nid < 3:
+          #entrylist = client.media.list(filter, pager)
 
+          # Print entry_id, date created, date last played
+          for entry in entrylist.objects:
+
+            if entry.lastPlayedAt > 0:
+              lastPlayedAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
+            else:
+              lastPlayedAt_str = "NULL"
+
+            sourceflavor = _getSourceFlavor(entry)
+
+            # If there is no source video, then do NOT delete the flavors
+            if sourceflavor == None:
+              print ("Video %s has no source video!  Cannot archive source video!" % (entry.id))
+
+            # But if there is a source video, then delete all other flavors
+            else:
+
+              file = _downloadVideoFile(sourceflavor)
+
+              _uploadToGlacier(s3, s3bucketname ,file)
+
+# Integrity check???
+
+              _addTag(entry, archivedtag)
+
+            nid = nid + 1
+
+          pager.pageIndex = pager.pageIndex + 1
+
+
+def _downloadVideoFile(sourceflavor):
           #print("\n".join(map(str, flavorassets)))
 
-
           # Get the Download URL of the source video
-#          src_url = client.flavorAsset.getUrl(src_id)
-#          print("ID of src = %s" % src_id)
-#          print("URL of src = %s" % src_url)
+          src_url = client.flavorAsset.getUrl(sourceflavor.id)
+          print("ID of src = %s" % src_id)
+          print("URL of src = %s" % src_url)
 
           # Download the source video
-          #urllib.urlretrieve (src_url, "video.mp4")
+          filepath = downloaddir + "tempvideofile"
+          urllib.urlretrieve (src_url, filepath)
 
+def _uploadToGlacier(s3, bucketname, file_path):
 
-# Then upload to AWS S3 Glacier
-# Then delete
+        b = s3.get_bucket(bucketname)
+
+        filename = os.path.basename(file_path)
+        k = b.new_key(filename)
+
+        mp = b.initiate_multipart_upload(filename)
+
+        source_size = os.stat(file_path).st_size
+        bytes_per_chunk = 2000*1024*1024
+        chunks_count = int(math.ceil(source_size / float(bytes_per_chunk)))
+
+        for i in range(chunks_count):
+                offset = i * bytes_per_chunk
+                remaining_bytes = source_size - offset
+                bytes = min([bytes_per_chunk, remaining_bytes])
+                part_num = i + 1
+
+                print "uploading part " + str(part_num) + " of " + str(chunks_count)
+
+                with open(file_path, 'r') as fp:
+                        fp.seek(offset)
+                        mp.upload_part_from_file(fp=fp, part_num=part_num, size=bytes)
+
+        if len(mp.get_all_parts()) == chunks_count:
+                mp.complete_upload()
+                print "upload_file done"
+        else:
+                mp.cancel_upload()
+                print "upload_file failed"
+
+          # Then upload to AWS S3 Glacier
 
 #          s3 = boto3.resource('s3')
-#          data = open('video.mp4', 'rb')
+#          data = open(filename, 'rb')
 #          s3.Bucket('kalturavids').put_object(Key='video.mp4', Body=data)          
 
-#          client.session.end()
  
 
 #######
@@ -193,6 +247,9 @@ entrylist = getEntriesWithFlavorsToDelete()
 
 deleteFlavors(entrylist)
 
-entrylist = getEntriesToArchive()
+#entrylist = getEntriesToArchive()
 
-archiveFlavors(entrylist)
+#archiveFlavors(entrylist)
+
+client.session.end()
+
