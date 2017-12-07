@@ -83,51 +83,61 @@ def deleteFlavors(entrylist):
           # Print entry_id, date created, date last played
           for entry in entrylist.objects:
 
-            if entry.createdAt > 0:
-              createdAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
-            else:
-              createdAt_str = "NULL"
-
             if entry.lastPlayedAt > 0:
               lastPlayedAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
             else:
               lastPlayedAt_str = "NULL"
 
-            src_id = None
-            src_url = None
+            sourceflavor = _getSourceFlavor(entry)
 
-            flavor_ids = []
+            # If there is no source video, then do NOT delete the flavors
+            if sourceflavor == None:
+              print ("Video %s has no source video!  Flavors not deleted!" % (entry.id))
 
-            # Find the ID and URL for the original flavor
-            print ("Looking up flavors for id = %s" % (entry.id))
-            flavorassetswparamslist = client.flavorAsset.getFlavorAssetsWithParams(entry.id)
+            # But if there is a source video, then delete all other flavors
+            else:
+              _deleteEntryFlavors(entry)
 
-            for flavorassetwparams in flavorassetswparamslist:
-              #print(type(flavorassetwparams).__name__)
-              flavorasset = flavorassetwparams.getFlavorAsset()
-              if flavorasset == None:
-                #print ("This flavorasset is null!")
-                x = 0
-
-              elif flavorasset.getIsOriginal():
-                #print ("flavorasset id = %s" %(flavorasset.id))
-                src_id = flavorasset.id
-                src_url = client.flavorAsset.getUrl(src_id)
-                #extension = flavorasset.getFileExt()
-              else:
-                #print ("flavorasset id = %s" %(flavorasset.id))
-                flavor_ids.append(flavorasset.id)
-
-            if src_id == None:
-              print ("id = %s has no source video!!" % (entry.id))
-
-            print ("Entry tags: %s" % (entry.tags))
-
-#            print ("id = %s, name = %s, createdAt = %s, lastPlayedAt = %s" % (entry.id, entry.name, createdAt_str, lastPlayedAt_str))
-#            print ("source flavor id = %s, source flavor url = %s\n\n" % (src_id, src_url))
             nid = nid + 1
 
           pager.pageIndex = pager.pageIndex + 1
+
+
+def _deleteEntryFlavors(entry):
+          flavorassetswparamslist = client.flavorAsset.getFlavorAssetsWithParams(entry.id)
+
+          for flavorassetwparams in flavorassetswparamslist:
+            flavorasset = flavorassetwparams.getFlavorAsset()
+            if flavorasset == None:
+              print ("This flavorasset is null!")
+
+            elif (not flavorasset.getIsOriginal()):
+              print ("Deleting flavor: %s" % (flavorasset.id))
+              #client.flavorAsset.delete(flavorasset.id)
+
+
+def _getSourceFlavor(entry):
+          flavorassetswparamslist = client.flavorAsset.getFlavorAssetsWithParams(entry.id)
+
+          for flavorassetwparams in flavorassetswparamslist:
+            #print(type(flavorassetwparams).__name__)
+            flavorasset = flavorassetwparams.getFlavorAsset()
+            if flavorasset == None:
+              print ("This flavorasset is null!")
+
+            elif flavorasset.getIsOriginal():
+              #print ("flavorasset id = %s" %(flavorasset.id))
+              #extension = flavorasset.getFileExt()
+              #src_id = flavorasset.id
+              #src_url = client.flavorAsset.getUrl(src_id)
+              return flavorasset
+            else:
+              #print ("flavorasset id = %s" %(flavorasset.id))
+              flavor_ids.append(flavorasset.id)
+
+          else:
+            return None
+
 
 def archiveFlavors(entrylist):
           return true
@@ -186,5 +196,3 @@ deleteFlavors(entrylist)
 entrylist = getEntriesToArchive()
 
 archiveFlavors(entrylist)
-
-
