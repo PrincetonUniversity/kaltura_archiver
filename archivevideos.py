@@ -2,6 +2,7 @@ import urllib
 import os
 import math
 import boto3
+import botocore
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
 from datetime import datetime
@@ -9,7 +10,7 @@ import calendar
 from dateutil.relativedelta import relativedelta
 
 # Flavors should be deleted after the video has not been played for this many years
-years2deleteflavors = 2
+years2deleteflavors = 10
 # The tag that will be applied to videos whose flavors have been deleted
 flavorsdeletedtag = "flavors_deleted"
 # Source should be moved to S3 after the video has not been played for this many years
@@ -18,7 +19,7 @@ years2archive = 3
 archivedtag = "archived_to_S3"
 
 # Directory to use for downloading videos from Kaltura
-downloaddir = /tmp
+downloaddir = "/tmp"
 # Name of S3 Glacier bucket
 s3bucketname = "kalturavids"
 
@@ -35,32 +36,23 @@ expiry = 432000 # 432000 = 5 days
 privileges = "disableentitlement"
 
 
-def startsession():
-	""" Use configuration to generate KS
-	"""
-	ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
-	client.setKs(ks)
-
-def getEntriesWithFlavorsToDelete():
-       entrylist = _getEntries(years2deleteflavors, flavorsdeletedtag)
-       return entrylist
-
 def getEntriesToArchive():
-       entrylist = _getEntries(years2archive, archivedtag)
+       entrylist = ""
        return entrylist
 
 
-def _getEntries(yearssinceplay, tag):
+def _getSearchFilter(yearssinceplay, tag):
 	""" List entries - Returns strings - Requires a KS generated for the client
 	"""
 
 	# Get list
 	filter = KalturaMediaEntryFilter()
+# Test scenario, search for only one video
+        filter.idEqual = "1_6cwwzio0"
 	#filter.orderBy = "-createdAt" # Newest first
 	filter.orderBy = "+createdAt" # Oldest first
 	filter.mediaTypeEqual = KalturaMediaType.VIDEO
         filter.tagsLike = "!" + tag
-        #filter.lastPlayedAtLessThanOrEqual = 
         filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
         filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
         filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
@@ -68,26 +60,33 @@ def _getEntries(yearssinceplay, tag):
         d = old_date - relativedelta(years=yearssinceplay)
         timestamp=calendar.timegm(d.utctimetuple())
         filter.advancedSearch.value = timestamp
-	pager = KalturaFilterPager()
-	pager.pageSize = 500
-	pager.pageIndex = 1
+        #filter.lastPlayedAtLessThanOrEqual = timestamp
 
-	entrylist = client.media.list(filter, pager)
+        return filter
 
-        return entrylist
+def deleteFlavors():
 
-def deleteFlavors(entrylist):
+        filter = _getSearchFilter(years2deleteflavors, flavorsdeletedtag)
+
+        pager = KalturaFilterPager()
+        pager.pageSize = 500
+        pager.pageIndex = 1
+
+        entrylist = client.media.list(filter, pager)
 
         # Get the total number of videos
 	totalcount = entrylist.totalCount
+        print ("Search found %s entries whose flavors should be deleted." % (entrylist.totalCount))
 
-	# Loop over the videos
+	# Loop over all videos
 	nid = 1
-	while nid < totalcount :
-	#while nid < 3:
-          #entrylist = client.media.list(filter, pager)
+	while nid <= totalcount :
 
-          # Print entry_id, date created, date last played
+          # If we've already been through the loop once, then get the next page
+          if nid > 1:
+            entrylist = client.media.list(filter, pager)
+
+          # Loop over the videos in this "page"
           for entry in entrylist.objects:
 
             if entry.lastPlayedAt > 0:
@@ -108,9 +107,10 @@ def deleteFlavors(entrylist):
               # Tag the video so that we know that this script deleted the flavors
               _addTag(entry, flavorsdeletedtag)
 
-            nid = nid + 1
+            nid += 1
 
-          pager.pageIndex = pager.pageIndex + 1
+          # Increment the pager index
+          pager.pageIndex += 1
 
 
 def _deleteEntryFlavors(entry):
@@ -138,22 +138,34 @@ def _getSourceFlavor(entry):
 
 def _addTag(entry, newtag):
         mediaEntry = KalturaMediaEntry()
-        mediaEntry.tags = entry.tags + ", " + flavorsdeletedtag
+        mediaEntry.tags = entry.tags + ", " + newtag
         client.media.update(entry.id, mediaEntry)
 
 
-def archiveFlavors(entrylist):
+def archiveFlavors():
 
-        s3 = boto3.resource('s3')
+        filter = _getSearchFilter(years2archive, archivedtag)
+
+        pager = KalturaFilterPager()
+        pager.pageSize = 500
+        pager.pageIndex = 1
+
+        entrylist = client.media.list(filter, pager)
+
+        s3resource = boto3.resource('s3')
+        s3client = boto3.client('s3')
 
         # Get the total number of videos
         totalcount = entrylist.totalCount
+        print ("Search found %s entries to be archived." % (entrylist.totalCount))
 
         # Loop over the videos
         nid = 1
-        while nid < totalcount :
-        #while nid < 3:
-          #entrylist = client.media.list(filter, pager)
+        while nid <= totalcount :
+
+          # If we've already been through the loop once, then get the next page
+          if nid > 1:
+            entrylist = client.media.list(filter, pager)
 
           # Print entry_id, date created, date last played
           for entry in entrylist.objects:
@@ -171,18 +183,30 @@ def archiveFlavors(entrylist):
 
             # But if there is a source video, then delete all other flavors
             else:
+              # Look ahead to see if this entry_id is already in S3, if it does then skip
+              if _S3ObjectExists(s3resource, s3bucketname, entry.id):
+                print ("Entry %s already exists in S3!!!" % (entry.id))
+                continue
 
-              file = _downloadVideoFile(sourceflavor)
+              videofile = _downloadVideoFile(sourceflavor)
 
-              _uploadToGlacier(s3, s3bucketname ,file)
+              # Use this method to upload large files
+              s3client.upload_file(videofile, s3bucketname, entry.id)
 
+# Catch/handle exceptions???
 # Integrity check???
 
-              _addTag(entry, archivedtag)
+              #_addTag(entry, archivedtag)
 
-            nid = nid + 1
+# Delete local file
+              os.remove(downloaddir + "/tempvideofile")
 
-          pager.pageIndex = pager.pageIndex + 1
+# Delete source flavor
+              #client.flavorAsset.delete(sourceflavor.id)
+
+            nid += 1
+
+          pager.pageIndex += 1
 
 
 def _downloadVideoFile(sourceflavor):
@@ -190,66 +214,40 @@ def _downloadVideoFile(sourceflavor):
 
           # Get the Download URL of the source video
           src_url = client.flavorAsset.getUrl(sourceflavor.id)
-          print("ID of src = %s" % src_id)
+          print("ID of src = %s" % sourceflavor.id)
           print("URL of src = %s" % src_url)
 
           # Download the source video
-          filepath = downloaddir + "tempvideofile"
+          filepath = downloaddir + "/tempvideofile"
           urllib.urlretrieve (src_url, filepath)
 
-def _uploadToGlacier(s3, bucketname, file_path):
+          return filepath
 
-        b = s3.get_bucket(bucketname)
 
-        filename = os.path.basename(file_path)
-        k = b.new_key(filename)
+def _S3ObjectExists(s3, bucketname, filename):
+  try:
+    s3.Object(bucketname, filename).load()
 
-        mp = b.initiate_multipart_upload(filename)
-
-        source_size = os.stat(file_path).st_size
-        bytes_per_chunk = 2000*1024*1024
-        chunks_count = int(math.ceil(source_size / float(bytes_per_chunk)))
-
-        for i in range(chunks_count):
-                offset = i * bytes_per_chunk
-                remaining_bytes = source_size - offset
-                bytes = min([bytes_per_chunk, remaining_bytes])
-                part_num = i + 1
-
-                print "uploading part " + str(part_num) + " of " + str(chunks_count)
-
-                with open(file_path, 'r') as fp:
-                        fp.seek(offset)
-                        mp.upload_part_from_file(fp=fp, part_num=part_num, size=bytes)
-
-        if len(mp.get_all_parts()) == chunks_count:
-                mp.complete_upload()
-                print "upload_file done"
-        else:
-                mp.cancel_upload()
-                print "upload_file failed"
-
-          # Then upload to AWS S3 Glacier
-
-#          s3 = boto3.resource('s3')
-#          data = open(filename, 'rb')
-#          s3.Bucket('kalturavids').put_object(Key='video.mp4', Body=data)          
-
+  except botocore.exceptions.ClientError as e:
+    # If we got a 404 error, then it doesn't exist
+    if e.response['Error']['Code'] == "404":
+      return False
+    else:
+        # Something else has gone wrong.
+      print ("Somethine went wrong: %s" % (e.response.message))
  
+  return True
 
 #######
 # Main Code
 #######
 
-startsession()
+ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
+client.setKs(ks)
 
-entrylist = getEntriesWithFlavorsToDelete()
+#deleteFlavors()
 
-deleteFlavors(entrylist)
-
-#entrylist = getEntriesToArchive()
-
-#archiveFlavors(entrylist)
+archiveFlavors()
 
 client.session.end()
 
