@@ -1,3 +1,4 @@
+import logging
 import urllib
 import os
 import math
@@ -34,6 +35,9 @@ client = KalturaClient(config)
 ktype = KalturaSessionType.ADMIN
 expiry = 432000 # 432000 = 5 days
 privileges = "disableentitlement"
+
+# Logging configuration
+logging.basicConfig(filename='./archivevideos.log',level=logging.DEBUG)
 
 
 def getEntriesToArchive():
@@ -76,7 +80,7 @@ def deleteFlavors():
 
         # Get the total number of videos
 	totalcount = entrylist.totalCount
-        print ("Search found %s entries whose flavors should be deleted." % (entrylist.totalCount))
+        logging.info("Search found %s entries whose flavors should be deleted." % (entrylist.totalCount))
 
 	# Loop over all videos
 	nid = 1
@@ -98,7 +102,7 @@ def deleteFlavors():
 
             # If there is no source video, then do NOT delete the flavors
             if sourceflavor == None:
-              print ("Video %s has no source video!  Flavors not deleted!" % (entry.id))
+              logging.warning("Video %s has no source video!  Flavors not deleted!" % (entry.id))
 
             # But if there is a source video, then delete all other flavors
             else:
@@ -119,8 +123,8 @@ def _deleteEntryFlavors(entry):
           for flavorassetwparams in flavorassetswparamslist:
             flavorasset = flavorassetwparams.getFlavorAsset()
             if (flavorasset != None and not flavorasset.getIsOriginal()):
-              print ("Deleting flavor: %s from entry: %s" % (flavorasset.id, entry.id))
-              #client.flavorAsset.delete(flavorasset.id)
+              logging.info("Deleting flavor: %s from entry: %s" % (flavorasset.id, entry.id))
+              client.flavorAsset.delete(flavorasset.id)
 
 
 def _getSourceFlavor(entry):
@@ -157,7 +161,7 @@ def archiveFlavors():
 
         # Get the total number of videos
         totalcount = entrylist.totalCount
-        print ("Search found %s entries to be archived." % (entrylist.totalCount))
+        logging.info("Search found %s entries to be archived." % (entrylist.totalCount))
 
         # Loop over the videos
         nid = 1
@@ -179,13 +183,13 @@ def archiveFlavors():
 
             # If there is no source video, then do NOT delete the flavors
             if sourceflavor == None:
-              print ("Video %s has no source video!  Cannot archive source video!" % (entry.id))
+              logging.warning("Video %s has no source video!  Cannot archive source video!" % (entry.id))
 
             # But if there is a source video, then delete all other flavors
             else:
               # Look ahead to see if this entry_id is already in S3, if it does then skip
               if _S3ObjectExists(s3resource, s3bucketname, entry.id):
-                print ("Entry %s already exists in S3!!!" % (entry.id))
+                logging.warning("Entry %s already exists in S3!!!" % (entry.id))
                 continue
 
               videofile = _downloadVideoFile(sourceflavor)
@@ -196,13 +200,13 @@ def archiveFlavors():
 # Catch/handle exceptions???
 # Integrity check???
 
-              #_addTag(entry, archivedtag)
+              _addTag(entry, archivedtag)
 
 # Delete local file
               os.remove(downloaddir + "/tempvideofile")
 
 # Delete source flavor
-              #client.flavorAsset.delete(sourceflavor.id)
+              client.flavorAsset.delete(sourceflavor.id)
 
             nid += 1
 
@@ -214,8 +218,8 @@ def _downloadVideoFile(sourceflavor):
 
           # Get the Download URL of the source video
           src_url = client.flavorAsset.getUrl(sourceflavor.id)
-          print("ID of src = %s" % sourceflavor.id)
-          print("URL of src = %s" % src_url)
+          logging.info("ID of src = %s" % sourceflavor.id)
+          logging.info("URL of src = %s" % src_url)
 
           # Download the source video
           filepath = downloaddir + "/tempvideofile"
@@ -234,7 +238,7 @@ def _S3ObjectExists(s3, bucketname, filename):
       return False
     else:
         # Something else has gone wrong.
-      print ("Somethine went wrong: %s" % (e.response.message))
+      logging.error("Somethine went wrong: %s" % (e.response.message))
  
   return True
 
@@ -242,12 +246,14 @@ def _S3ObjectExists(s3, bucketname, filename):
 # Main Code
 #######
 
-ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
-client.setKs(ks)
+if __name__ == '__main__':
 
-#deleteFlavors()
+  ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
+  client.setKs(ks)
 
-archiveFlavors()
+  #deleteFlavors()
 
-client.session.end()
+  #archiveFlavors()
+
+  client.session.end()
 
