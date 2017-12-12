@@ -11,11 +11,11 @@ import calendar
 from dateutil.relativedelta import relativedelta
 
 # Flavors should be deleted after the video has not been played for this many years
-years2deleteflavors = 10
+years2deleteflavors = 0
 # The tag that will be applied to videos whose flavors have been deleted
 flavorsdeletedtag = "flavors_deleted"
 # Source should be moved to S3 after the video has not been played for this many years
-years2archive = 3
+years2archive = 0
 # The tag that will be applied to videos that have been archived in S3
 archivedtag = "archived_to_S3"
 
@@ -37,8 +37,7 @@ expiry = 432000 # 432000 = 5 days
 privileges = "disableentitlement"
 
 # Logging configuration
-logging.basicConfig(filename='./archivevideos.log',level=logging.DEBUG)
-
+logging.basicConfig(filename='./archivevideos.log',level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 def getEntriesToArchive():
        entrylist = ""
@@ -53,6 +52,7 @@ def _getSearchFilter(yearssinceplay, tag):
 	filter = KalturaMediaEntryFilter()
 # Test scenario, search for only one video
         filter.idEqual = "1_6cwwzio0"
+#        filter.idEqual = "1_qcz6sate"
 	#filter.orderBy = "-createdAt" # Newest first
 	filter.orderBy = "+createdAt" # Oldest first
 	filter.mediaTypeEqual = KalturaMediaType.VIDEO
@@ -92,6 +92,19 @@ def deleteFlavors():
 
           # Loop over the videos in this "page"
           for entry in entrylist.objects:
+
+            #print("Thumbnail URL = %s" % (entry.thumbnailUrl))
+            #thumbfilter = KalturaThumbAssetFilter()
+            #thumbfilter.entryIdEqual = "1_6cwwzio0"
+
+            #thumbslist = client.thumbAsset.list(thumbfilter)
+            #for thumb in thumbslist.objects:
+            #  print ("Thumb id = %s" % (thumb.id))
+            #  print ("Thumb description = %s" % (thumb.description))
+            #  thumburl = client.thumbAsset.getUrl(thumb.id)
+            #  print ("Thumb URL = %s" % (thumburl))
+
+            #client.thumbAsset.regenerate(thumb.id)
 
             if entry.lastPlayedAt > 0:
               lastPlayedAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
@@ -157,7 +170,7 @@ def archiveFlavors():
         entrylist = client.media.list(filter, pager)
 
         s3resource = boto3.resource('s3')
-        s3client = boto3.client('s3')
+        #s3client = boto3.client('s3')
 
         # Get the total number of videos
         totalcount = entrylist.totalCount
@@ -195,7 +208,9 @@ def archiveFlavors():
               videofile = _downloadVideoFile(sourceflavor)
 
               # Use this method to upload large files
-              s3client.upload_file(videofile, s3bucketname, entry.id)
+              #s3client.upload_file(videofile, s3bucketname, entry.id)
+              #  Apparently you can get the client from the resource this way
+              s3resource.meta.client.upload_file(videofile, s3bucketname, entry.id)
 
 # Catch/handle exceptions???
 # Integrity check???
@@ -242,6 +257,41 @@ def _S3ObjectExists(s3, bucketname, filename):
  
   return True
 
+def restoreVideo(entryid):
+
+  logging.info("Restoring video with entry_id = %s" % (entryid))
+
+  # Get the video file from S3, how long might that take given that it's glacier??
+
+  filepath = downloaddir + "/tempS3videofile"
+
+  s3resource = boto3.resource('s3')
+
+  logging.debug("Downloading video from S3")
+  s3resource.meta.client.download_file(s3bucketname, entryid, filepath)
+
+  # Upload the file to Kaltura and re-link it to the media entry
+
+  logging.debug("Uploading video to Kaltura")
+  uploadToken = KalturaUploadToken();
+  uploadToken = client.uploadToken.add(uploadToken);
+
+  ulfile = file(filepath);
+
+  client.uploadToken.upload(uploadToken.id, ulfile);
+
+  uploadedFileTokenResource = KalturaUploadedFileTokenResource();
+  uploadedFileTokenResource.token = uploadToken.id;
+
+  client.media.addContent(entryid, uploadedFileTokenResource);
+
+  os.remove(filepath)
+
+# Delete file from S3??
+
+# Remove tags from Kaltura entry??
+
+
 #######
 # Main Code
 #######
@@ -254,6 +304,11 @@ if __name__ == '__main__':
   #deleteFlavors()
 
   #archiveFlavors()
+
+  # Initiate retrieval from Glacier before being able to restore
+  # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
+
+  restoreVideo("1_6cwwzio0")
 
   client.session.end()
 
