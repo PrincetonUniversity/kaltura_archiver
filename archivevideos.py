@@ -24,6 +24,7 @@ downloaddir = "/tmp"
 # Name of S3 Glacier bucket
 s3bucketname = "kalturavids"
 
+placeholder_file_path = "./placeholder_video.mp4"
 
 # Kaltura KMC connection information, pulled from environment variables
 partnerId = os.getenv("KALTURA_PARTNERID")
@@ -44,90 +45,94 @@ def getEntriesToArchive():
        return entrylist
 
 
-def _getSearchFilter(yearssinceplay, tag):
-	""" List entries - Returns strings - Requires a KS generated for the client
-	"""
+def _getSearchFilter(yearssinceplay, tag, categoryid, entryid):
+    # Get list
+    filter = KalturaMediaEntryFilter()
 
-	# Get list
-	filter = KalturaMediaEntryFilter()
-# Test scenario, search for only one video
-        filter.idEqual = "1_6cwwzio0"
-#        filter.idEqual = "1_qcz6sate"
-	#filter.orderBy = "-createdAt" # Newest first
-	filter.orderBy = "+createdAt" # Oldest first
-	filter.mediaTypeEqual = KalturaMediaType.VIDEO
+    # filter.orderBy = "-createdAt" # Newest first
+    filter.orderBy = "+createdAt"  # Oldest first
+    filter.mediaTypeEqual = KalturaMediaType.VIDEO
+
+# Test file
+    filter.idEqual = "1_6cwwzio0"
+
+    if entryid is not None:
+        filter.idEqual = entryid
+
+    if tag is not None:
         filter.tagsLike = "!" + tag
+
+    if yearssinceplay is not None:
         filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
         filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
         filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
         old_date = datetime.now()
         d = old_date - relativedelta(years=yearssinceplay)
-        timestamp=calendar.timegm(d.utctimetuple())
+        timestamp = calendar.timegm(d.utctimetuple())
         filter.advancedSearch.value = timestamp
-        #filter.lastPlayedAtLessThanOrEqual = timestamp
 
-        return filter
+        # filter.lastPlayedAtLessThanOrEqual = timestamp
+
+    if categoryid is not None:
+        filter.categoryAncestorIdIn = categoryid
+
+    return filter
 
 def deleteFlavors():
 
-        filter = _getSearchFilter(years2deleteflavors, flavorsdeletedtag)
+    filter = _getSearchFilter(years2deleteflavors, flavorsdeletedtag, None, None)
 
-        pager = KalturaFilterPager()
-        pager.pageSize = 500
-        pager.pageIndex = 1
+    pager = KalturaFilterPager()
+    pager.pageSize = 500
+    pager.pageIndex = 1
 
+    entrylist = client.media.list(filter, pager)
+
+    # Get the total number of videos
+    totalcount = entrylist.totalCount
+    logging.info("Search found %s entries whose flavors should be deleted." % (entrylist.totalCount))
+
+    # Loop over all videos
+    nid = 1
+    while nid <= totalcount:
+
+      # If we've already been through the loop once, then get the next page
+      if nid > 1:
         entrylist = client.media.list(filter, pager)
 
-        # Get the total number of videos
-	totalcount = entrylist.totalCount
-        logging.info("Search found %s entries whose flavors should be deleted." % (entrylist.totalCount))
+      # Loop over the videos in this "page"
+      for entry in entrylist.objects:
 
-	# Loop over all videos
-	nid = 1
-	while nid <= totalcount :
+        #print("Thumbnail URL = %s" % (entry.thumbnailUrl))
+        #thumbfilter = KalturaThumbAssetFilter()
+        #thumbfilter.entryIdEqual = "1_6cwwzio0"
 
-          # If we've already been through the loop once, then get the next page
-          if nid > 1:
-            entrylist = client.media.list(filter, pager)
+        #thumbslist = client.thumbAsset.list(thumbfilter)
+        #for thumb in thumbslist.objects:
+        #  print ("Thumb id = %s" % (thumb.id))
+        #  print ("Thumb description = %s" % (thumb.description))
+        #  thumburl = client.thumbAsset.getUrl(thumb.id)
+        #  print ("Thumb URL = %s" % (thumburl))
 
-          # Loop over the videos in this "page"
-          for entry in entrylist.objects:
+        #client.thumbAsset.regenerate(thumb.id)
 
-            #print("Thumbnail URL = %s" % (entry.thumbnailUrl))
-            #thumbfilter = KalturaThumbAssetFilter()
-            #thumbfilter.entryIdEqual = "1_6cwwzio0"
+        sourceflavor = _getSourceFlavor(entry)
 
-            #thumbslist = client.thumbAsset.list(thumbfilter)
-            #for thumb in thumbslist.objects:
-            #  print ("Thumb id = %s" % (thumb.id))
-            #  print ("Thumb description = %s" % (thumb.description))
-            #  thumburl = client.thumbAsset.getUrl(thumb.id)
-            #  print ("Thumb URL = %s" % (thumburl))
+        # If there is no source video, then do NOT delete the flavors
+        if sourceflavor == None:
+          logging.warning("Video %s has no source video!  Flavors not deleted!" % (entry.id))
 
-            #client.thumbAsset.regenerate(thumb.id)
+        # But if there is a source video, then delete all other flavors
+        else:
+          # Delete the flavors
+          _deleteEntryFlavors(entry)
+          # Tag the video so that we know that this script deleted the flavors
+          _addTag(entry, flavorsdeletedtag)
 
-            if entry.lastPlayedAt > 0:
-              lastPlayedAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
-            else:
-              lastPlayedAt_str = "NULL"
+        nid += 1
 
-            sourceflavor = _getSourceFlavor(entry)
-
-            # If there is no source video, then do NOT delete the flavors
-            if sourceflavor == None:
-              logging.warning("Video %s has no source video!  Flavors not deleted!" % (entry.id))
-
-            # But if there is a source video, then delete all other flavors
-            else:
-              # Delete the flavors
-              _deleteEntryFlavors(entry)
-              # Tag the video so that we know that this script deleted the flavors
-              _addTag(entry, flavorsdeletedtag)
-
-            nid += 1
-
-          # Increment the pager index
-          pager.pageIndex += 1
+      # Increment the pager index
+      pager.pageIndex += 1
 
 
 def _deleteEntryFlavors(entry):
@@ -161,7 +166,7 @@ def _addTag(entry, newtag):
 
 def archiveFlavors():
 
-        filter = _getSearchFilter(years2archive, archivedtag)
+        filter = _getSearchFilter(years2archive, archivedtag, None, None)
 
         pager = KalturaFilterPager()
         pager.pageSize = 500
@@ -187,11 +192,6 @@ def archiveFlavors():
           # Print entry_id, date created, date last played
           for entry in entrylist.objects:
 
-            if entry.lastPlayedAt > 0:
-              lastPlayedAt_str = datetime.fromtimestamp(entry.createdAt).strftime('%Y-%m-%d %H:%M:%S')
-            else:
-              lastPlayedAt_str = "NULL"
-
             sourceflavor = _getSourceFlavor(entry)
 
             # If there is no source video, then do NOT delete the flavors
@@ -203,6 +203,7 @@ def archiveFlavors():
               # Look ahead to see if this entry_id is already in S3, if it does then skip
               if _S3ObjectExists(s3resource, s3bucketname, entry.id):
                 logging.warning("Entry %s already exists in S3!!!" % (entry.id))
+                nid += 1
                 continue
 
               videofile = _downloadVideoFile(sourceflavor)
@@ -222,6 +223,8 @@ def archiveFlavors():
 
 # Delete source flavor
               client.flavorAsset.delete(sourceflavor.id)
+
+              uploadPlaceholder(entry.id)
 
             nid += 1
 
@@ -270,6 +273,23 @@ def restoreVideo(entryid):
   logging.debug("Downloading video from S3")
   s3resource.meta.client.download_file(s3bucketname, entryid, filepath)
 
+  _uploadVideo(filepath)
+
+  os.remove(filepath)
+
+# Delete file from S3??
+
+# Remove tags from Kaltura entry??
+
+
+def uploadPlaceholder(entryid):
+
+    logging.debug("Uploading placeholder video for entry: " % (entryid))
+    _uploadVideo(entryid, placeholder_file_path)
+
+
+def _uploadVideo(entryid, filepath):
+
   # Upload the file to Kaltura and re-link it to the media entry
 
   logging.debug("Uploading video to Kaltura")
@@ -285,18 +305,15 @@ def restoreVideo(entryid):
 
   client.media.addContent(entryid, uploadedFileTokenResource);
 
-  os.remove(filepath)
-
-# Delete file from S3??
-
-# Remove tags from Kaltura entry??
-
 
 #######
 # Main Code
 #######
 
 if __name__ == '__main__':
+
+  # Check configuration
+  checkConfig()
 
   ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
   client.setKs(ks)
@@ -308,7 +325,9 @@ if __name__ == '__main__':
   # Initiate retrieval from Glacier before being able to restore
   # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
 
-  restoreVideo("1_6cwwzio0")
+  uploadPlaceholder("1_6cwwzio0")
+
+  #restoreVideo("1_6cwwzio0")
 
   client.session.end()
 
