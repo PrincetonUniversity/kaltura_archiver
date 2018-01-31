@@ -23,10 +23,14 @@ years2archive = 0
 # The tag that will be applied to videos that have been archived in S3
 archivedtag = "archived_to_S3"
 
+# Size limit for source video that will be archived (in KB)
+#video_size_limit = 15000000
+video_size_limit = 0
 # Directory to use for downloading videos from Kaltura
 downloaddir = "/tmp"
 # Name of S3 Glacier bucket
-s3bucketname = "kalturavids"
+#s3bucketname = "kalturavids"
+s3bucketname="james-madison-program-videos"
 
 # File to be uploaded when all flavors are deleted
 placeholder_file_path = "./placeholder_video.mp4"
@@ -46,6 +50,9 @@ privileges = "disableentitlement"
 logging.basicConfig(filename='./archivevideos.log',level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 def checkConfig():
+    """Check to make sure that required configuration parameters are properly set.
+    Check ability to connect to S3.
+    """
 
     # Check for access to S3 bucket
     try:
@@ -65,42 +72,14 @@ def checkConfig():
         logging.fatal("Exiting immediately")
         exit(errno.ENOENT)
 
-def _getSearchFilter(yearssinceplay, tag, categoryid, entryid):
-    # Get list
-    filter = KalturaMediaEntryFilter()
-
-    # filter.orderBy = "-createdAt" # Newest first
-    filter.orderBy = "+createdAt"  # Oldest first
-    filter.mediaTypeEqual = KalturaMediaType.VIDEO
-
-# Test entry
-    filter.idEqual = "1_6cwwzio0"
-
-    if entryid is not None:
-        filter.idEqual = entryid
-
-    if tag is not None:
-        filter.tagsLike = "!" + tag
-
-    if yearssinceplay is not None:
-        filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-        filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
-        filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
-        old_date = datetime.now()
-        d = old_date - relativedelta(years=yearssinceplay)
-        timestamp = calendar.timegm(d.utctimetuple())
-        filter.advancedSearch.value = timestamp
-
-        # filter.lastPlayedAtLessThanOrEqual = timestamp
-
-    if categoryid is not None:
-        filter.categoryAncestorIdIn = categoryid
-
-    return filter
-
 def deleteFlavors():
+    """ Delete derived flavors, but not the original
 
-    filter = _getSearchFilter(years2deleteflavors, flavorsdeletedtag, None, None)
+    :return:
+    """
+
+    # Find all videos not played since years2deleteflavors that do not have the flavorsdeletedtag
+    filter = _constructSearchFilter(years2deleteflavors, "!"+flavorsdeletedtag, None, None)
 
     pager = KalturaFilterPager()
     pager.pageSize = 500
@@ -116,54 +95,278 @@ def deleteFlavors():
     nid = 1
     while nid <= totalcount:
 
-      # If we've already been through the loop once, then get the next page
-      if nid > 1:
-        entrylist = client.media.list(filter, pager)
+        # If we've already been through the loop once, then get the next page
+        if nid > 1:
+            entrylist = client.media.list(filter, pager)
 
-      # Loop over the videos in this "page"
-      for entry in entrylist.objects:
+        # Loop over the videos in this "page"
+        for entry in entrylist.objects:
 
-        #print("Thumbnail URL = %s" % (entry.thumbnailUrl))
-        #thumbfilter = KalturaThumbAssetFilter()
-        #thumbfilter.entryIdEqual = "1_6cwwzio0"
+            #print("Thumbnail URL = %s" % (entry.thumbnailUrl))
+            #thumbfilter = KalturaThumbAssetFilter()
+            #thumbfilter.entryIdEqual = "1_6cwwzio0"
 
-        #thumbslist = client.thumbAsset.list(thumbfilter)
-        #for thumb in thumbslist.objects:
-        #  print ("Thumb id = %s" % (thumb.id))
-        #  print ("Thumb description = %s" % (thumb.description))
-        #  thumburl = client.thumbAsset.getUrl(thumb.id)
-        #  print ("Thumb URL = %s" % (thumburl))
+            #thumbslist = client.thumbAsset.list(thumbfilter)
+            #for thumb in thumbslist.objects:
+            #  print ("Thumb id = %s" % (thumb.id))
+            #  print ("Thumb description = %s" % (thumb.description))
+            #  thumburl = client.thumbAsset.getUrl(thumb.id)
+            #  print ("Thumb URL = %s" % (thumburl))
 
-        #client.thumbAsset.regenerate(thumb.id)
+            #client.thumbAsset.regenerate(thumb.id)
 
-        sourceflavor = _getSourceFlavor(entry)
+            sourceflavor = _getSourceFlavor(entry)
 
-        # If there is no source video, then do NOT delete the flavors
-        if sourceflavor == None:
-          logging.warning("Video %s has no source video!  Flavors not deleted!" % (entry.id))
+            # If there is no source video, then do NOT delete the flavors, skip this video
+            if sourceflavor == None:
+                logging.warning("Video %s has no source video!  Flavors not deleted!" % (entry.id))
 
-        # But if there is a source video, then delete all other flavors
-        else:
-          # Delete the flavors
-          _deleteEntryFlavors(entry.id, False)
+            # But if there is a source video, then delete all other flavors
+            else:
+                # Delete the flavors
+                _deleteEntryFlavors(entry.id, False)
 
-          # Tag the video so that we know that this script deleted the flavors
-          _addTag(entry, flavorsdeletedtag)
+                # Tag the video so that we know that this script deleted the flavors
+                _addTag(entry, flavorsdeletedtag)
 
-        nid += 1
+            nid += 1
 
-      # Increment the pager index
-      pager.pageIndex += 1
+        # Increment the pager index
+        pager.pageIndex += 1
 
 
-def _deleteEntryFlavors(entryid, includesource=False):
+def archiveFlavors():
 
+    # Limit to James Madison Program category
+    prod_jmp_category = "13469091"
+    #filter = _constructSearchFilter(years2archive, archivedtag, prod_jmp_category, None)
+    filter = _constructSearchFilter(None, None, prod_jmp_category, "1_shhasawz")
+
+    pager = KalturaFilterPager()
+    pager.pageSize = 500
+    pager.pageIndex = 1
+
+    entrylist = client.media.list(filter, pager)
+
+    s3resource = boto3.resource('s3')
+    #s3client = boto3.client('s3')
+
+    # Get the total number of videos
+    totalcount = entrylist.totalCount
+    logging.info("Search found %s entries to be archived." % (entrylist.totalCount))
+
+    # Loop over the videos
+    nid = 1
+    while nid <= totalcount :
+
+        # If we've already been through the loop once, then get the next page
+        if nid > 1:
+            entrylist = client.media.list(filter, pager)
+
+        # Print entry_id, date created, date last played
+        for entry in entrylist.objects:
+
+            sourceflavor = _getSourceFlavor(entry)
+
+            # If there is no source video, then do NOT delete the flavors
+            if sourceflavor == None:
+                logging.warning("Video %s has no source video!  Cannot archive source video!" % (entry.id))
+
+            # If the file is too big to download/upload, then skip
+            if sourceflavor.size > video_size_limit:
+                logging.warning("Source video size %s exceeds limit %s !  Cannot archive source video! %s" % (sourceflavor.size, video_size_limit, entry.id))
+                nid += 1
+                continue
+
+            # But if there is a source video, then archive it and delete all flavors
+            else:
+                # Look ahead to see if this entry_id is already in S3, if it does then skip
+                if _S3ObjectExists(s3resource, s3bucketname, entry.id):
+                    logging.warning("Source file for entry %s already exists in S3!!!" % (entry.id))
+                    nid += 1
+                    continue
+
+                logging.info("Archiving entry: %s" % (entry.id))
+                if not dryrun:
+
+                    try:
+                        logging.debug("Downloading source video from Kaltura ...")
+                        videofile = _downloadVideoFile(sourceflavor)
+
+                        logging.debug("Uploading source video to S3 ...")
+                        s3resource.meta.client.upload_file(videofile, s3bucketname, entry.id)
+
+                        # Catch/handle exceptions???
+                        # Integrity check???
+
+                        logging.debug("Adding tag %s to Kaltura entry" % (archivedtag))
+                        #_addTag(entry, archivedtag)
+
+                        # Delete local file
+                        os.remove(downloaddir + "/tempvideofile")
+
+                        # Delete all flavors including source
+                        logging.debug("Deleting all flavors ...")
+                        #_deleteEntryFlavors(entry.id, True)
+
+                        logging.debug("Uploading placeholder video ...")
+                        #uploadPlaceholder(entry.id)
+
+                    except Exception as e:
+                        logging.error("Error encountered: %s" % (str(e)))
+
+            nid += 1
+
+        pager.pageIndex += 1
+
+def restoreVideos():
+    """
+    Restore all videos that have been played after having been archived
+    :return:
+    """
+
+    filter = _constructSearchFilter(years2archive, archivedtag, None, None)
+
+    pager = KalturaFilterPager()
+    pager.pageSize = 500
+    pager.pageIndex = 1
+
+    entrylist = client.media.list(filter, pager)
+
+    # Get the total number of videos
+    totalcount = entrylist.totalCount
+    logging.info("Search found %s entries to be archived." % entrylist.totalCount)
+
+    # Loop over the videos
+    nid = 1
+    while nid <= totalcount:
+
+        # If we've already been through the loop once, then get the next page
+        if nid > 1:
+            entrylist = client.media.list(filter, pager)
+
+        # Print entry_id, date created, date last played
+        for entry in entrylist.objects:
+
+            _restoreVideo(entry.id)
+
+            nid += 1
+
+        pager.pageIndex += 1
+
+
+def _restoreVideo(entryid):
+    """
+    Restore a single video
+    :param entryid: the id of the video
+    :return:
+    """
+
+    logging.info("Restoring video with entry_id = %s" % entryid)
+
+    # Retrieve the video from Glacier
+
+    video_available = _restoreFromGlacier(entryid)
+
+    # If the video is available for download from S3, then continue with restore
+    if video_available:
+
+        filepath = downloaddir + "/tempS3videofile"
+
+        s3resource = boto3.resource('s3')
+
+        logging.debug("Downloading video from S3")
+
+        if not dryrun:
+            s3resource.meta.client.download_file(s3bucketname, entryid, filepath)
+
+            # Delete placeholder video
+            _deleteEntryFlavors(entryid, True)
+
+            # Upload original video
+            _uploadVideo(filepath)
+
+            os.remove(filepath)
+
+    # If the video is not yet available for download from S3, then wait until the next time this script runs
+    else:
+        logging.info("Video with entry_id %s is not yet available for download from S3" % entryid)
+
+
+    #TODO: Remove tags from Kaltura entry??
+
+
+def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
+    """ Construct the search filter used to find videos.
+
+    :param yearsinceplay: the number of years since the video has been played
+    :param tag: videos with tag, if tag begins with '!' then videos without tag
+    :param categoryid: videos in this category
+    :param entryid: id of a specific video
+    """
+
+    # Get list
+    filter = KalturaMediaEntryFilter()
+
+    # filter.orderBy = "-createdAt" # Newest first
+    filter.orderBy = "+createdAt"  # Oldest first
+    filter.mediaTypeEqual = KalturaMediaType.VIDEO
+
+    if entryid is not None:
+        filter.idEqual = entryid
+
+    # Filter based on existance or lack of existance of a tag
+    if tag is not None:
+        tagfilter = KalturaMediaEntryMatchAttributeCondition()
+
+        # If the string begins with an exclamation, set the NOT comparison to true and remove the exclamation
+        if tag.startswith("!"):
+            tagfilter.not_ = True
+            tag = tag[1:]
+
+        tagfilter.value = tag
+
+        tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
+
+        filter.advancedSearch = tagfilter
+
+        #filter.tagsLike = "!" + tag
+
+    if yearssinceplay is not None:
+        old_date = datetime.now()
+        d = old_date - relativedelta(years=yearssinceplay)
+        timestamp = calendar.timegm(d.utctimetuple())
+
+        # Created prior to this date
+        #filter.createdAtLessThanOrEqual = timestamp
+
+        # And not played since this date
+        #filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
+        #filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
+        #filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
+        #filter.advancedSearch.value = timestamp
+
+        filter.lastPlayedAtLessThanOrEqual = timestamp
+
+    if categoryid is not None:
+        filter.categoryAncestorIdIn = categoryid
+
+    return filter
+
+def _deleteEntryFlavors(entryid, deletesource=False):
+    """ Delete video flavors
+    :param entryid: id of the video
+    :param deletesource: If True then delete the source video as well, otherwise delete only derived flavors
+    :return:
+    """
+
+    # Get the list of flavors
     flavorassetswparamslist = client.flavorAsset.getFlavorAssetsWithParams(entryid)
 
     for flavorassetwparams in flavorassetswparamslist:
         flavorasset = flavorassetwparams.getFlavorAsset()
 
-        if (flavorasset is not None and flavorasset.getIsOriginal() and includesource):
+        if (flavorasset is not None and flavorasset.getIsOriginal() and deletesource):
             logging.info("Deleting source flavor: %s from entry: %s" % (flavorasset.id, entryid))
             if not dryrun:
                 client.flavorAsset.delete(flavorasset.id)
@@ -195,76 +398,10 @@ def _addTag(entry, newtag):
             client.media.update(entry.id, mediaEntry)
 
 
-def archiveFlavors():
-
-        filter = _getSearchFilter(years2archive, archivedtag, None, None)
-
-        pager = KalturaFilterPager()
-        pager.pageSize = 500
-        pager.pageIndex = 1
-
-        entrylist = client.media.list(filter, pager)
-
-        s3resource = boto3.resource('s3')
-        #s3client = boto3.client('s3')
-
-        # Get the total number of videos
-        totalcount = entrylist.totalCount
-        logging.info("Search found %s entries to be archived." % (entrylist.totalCount))
-
-        # Loop over the videos
-        nid = 1
-        while nid <= totalcount :
-
-          # If we've already been through the loop once, then get the next page
-          if nid > 1:
-            entrylist = client.media.list(filter, pager)
-
-          # Print entry_id, date created, date last played
-          for entry in entrylist.objects:
-
-            sourceflavor = _getSourceFlavor(entry)
-
-            # If there is no source video, then do NOT delete the flavors
-            if sourceflavor == None:
-              logging.warning("Video %s has no source video!  Cannot archive source video!" % (entry.id))
-
-            # But if there is a source video, then delete all other flavors
-            else:
-              # Look ahead to see if this entry_id is already in S3, if it does then skip
-              if _S3ObjectExists(s3resource, s3bucketname, entry.id):
-                logging.warning("Source file for entry %s already exists in S3!!!" % (entry.id))
-                nid += 1
-                continue
-
-              logging.info("Archiving entry: %s" % (entry.id))
-              if not dryrun:
-                videofile = _downloadVideoFile(sourceflavor)
-
-              if not dryrun:
-                s3resource.meta.client.upload_file(videofile, s3bucketname, entry.id)
-
-# Catch/handle exceptions???
-# Integrity check???
-
-              _addTag(entry, archivedtag)
-
-              # Delete local file
-              if not dryrun:
-                os.remove(downloaddir + "/tempvideofile")
-
-              # Delete all flavors including source
-              _deleteEntryFlavors(entry.id, True)
-
-              uploadPlaceholder(entry.id)
-
-            nid += 1
-
-          pager.pageIndex += 1
-
-
 def _downloadVideoFile(sourceflavor):
     #print("\n".join(map(str, flavorassets)))
+
+    #TODO Check to see that we have enough local disk space for download?
 
     # Get the Download URL of the source video
     src_url = client.flavorAsset.getUrl(sourceflavor.id)
@@ -274,7 +411,12 @@ def _downloadVideoFile(sourceflavor):
     filepath = downloaddir + "/tempvideofile"
 
     if not dryrun:
-        urllib.urlretrieve (src_url, filepath)
+        # If this fails, try it again?
+        try:
+            urllib.urlretrieve (src_url, filepath)
+        #TODO  Do something with this exception to cause a retry???
+        except Exception as e:
+            logging.warn("Error when downloading source: %s" % (e.response.message))
 
     return filepath
 
@@ -293,32 +435,53 @@ def _S3ObjectExists(s3, bucketname, filename):
  
   return True
 
-def restoreVideo(entryid):
 
-  logging.info("Restoring video with entry_id = %s" % (entryid))
+def _restoreFromGlacier(entry_id):
+    """ Restore file from Glacier to standard S3.  Return True if file is available for download. """
 
-  # Get the video file from S3, how long might that take given that it's glacier??
+    # Check current status
+    s3 = boto3.resource('s3')
+    obj = s3.Object(s3bucketname, entry_id)
 
-  filepath = downloaddir + "/tempS3videofile"
+    storage_class = obj.storage_class
+    restore = obj.restore
 
-  s3resource = boto3.resource('s3')
+    print ("Storage class: %s" % storage_class)
+    print("Restore status: %s" % restore)
 
-  logging.debug("Downloading video from S3")
+    if obj.storage_class == 'GLACIER':
 
-  if not dryrun:
-    s3resource.meta.client.download_file(s3bucketname, entryid, filepath)
+        # If no request has been made to restore, make the request
+        if obj.restore is None:
+            logging.info("Submitting request to restore %s from Glacier." % entry_id)
 
-  _uploadVideo(filepath)
+            if not dryrun:
+                bucket = s3.Bucket(s3bucketname)
+                bucket.meta.client.restore_object(
+                    Bucket=s3bucketname,
+                    Key=entry_id,
+                    RestoreRequest={'Days': 2,
+                                    'GlacierJobParameters': {'Tier': 'Bulk'}}
+                )
 
-  if not dryrun:
-    os.remove(filepath)
+            return False
 
-# Delete file from S3??
+        # If a restore request was already made and completed, then the file should be available for download
+        elif obj.restore.startswith('ongoing-request="false"'):
+            logging.info("Video %s has been restored from Glacier and is ready for download from S3" % entry_id)
+            return True
 
-# Remove tags from Kaltura entry??
+        #TODO If neither condition applies, should we throw an exception?
+
+    # If the storage class is GLACIER, then the file should be available for download
+    else:
+        logging.info("Video %s is not a Glacier object and is ready for download from S3" % entry_id)
+        return True
 
 
-def uploadPlaceholder(entryid):
+
+
+def _uploadPlaceholder(entryid):
 
     logging.debug("Uploading placeholder video for entry: %s" % (entryid))
     _uploadVideo(entryid, placeholder_file_path)
@@ -350,6 +513,7 @@ def _uploadVideo(entryid, filepath):
 
 if __name__ == '__main__':
 
+    # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument("--dryrun", help="Do not make any changes",
                         action="store_true")
@@ -361,6 +525,7 @@ if __name__ == '__main__':
     # Check configuration
     checkConfig()
 
+    # Create Kaltura client
     try:
         ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
         client.setKs(ks)
@@ -369,16 +534,14 @@ if __name__ == '__main__':
         logging.fatal("Exiting immediately")
         exit(errno.EACCES)
 
-    deleteFlavors()
+    #deleteFlavors()
 
-    archiveFlavors()
+    #archiveFlavors()
 
     # Initiate retrieval from Glacier before being able to restore
     # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
 
-    #uploadPlaceholder("1_6cwwzio0", placeholder_file_path)
-
-    #restoreVideo("1_6cwwzio0")
+    #restoreVideos("1_6cwwzio0")
 
     client.session.end()
 
