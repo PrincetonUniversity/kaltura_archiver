@@ -25,12 +25,11 @@ archivedtag = "archived_to_S3"
 
 # Size limit for source video that will be archived (in KB)
 #video_size_limit = 15000000
-video_size_limit = 0
+video_size_limit = 10000000
 # Directory to use for downloading videos from Kaltura
 downloaddir = "/tmp"
 # Name of S3 Glacier bucket
-#s3bucketname = "kalturavids"
-s3bucketname="james-madison-program-videos"
+s3bucketname="kalturavids"
 
 # File to be uploaded when all flavors are deleted
 placeholder_file_path = "./placeholder_video.mp4"
@@ -56,6 +55,7 @@ def checkConfig():
 
     # Check for access to S3 bucket
     try:
+        logging.debug("Checking to see if we can connect with S3 ...")
         s3resource = boto3.resource('s3')
         s3resource.meta.client.head_bucket(Bucket=s3bucketname)
     except Exception as e:
@@ -137,10 +137,7 @@ def deleteFlavors():
 
 def archiveFlavors():
 
-    # Limit to James Madison Program category
-    prod_jmp_category = "13469091"
-    #filter = _constructSearchFilter(years2archive, archivedtag, prod_jmp_category, None)
-    filter = _constructSearchFilter(None, None, prod_jmp_category, "1_shhasawz")
+    filter = _constructSearchFilter(years2archive, "!"+archivedtag, None, None)
 
     pager = KalturaFilterPager()
     pager.pageSize = 500
@@ -170,50 +167,61 @@ def archiveFlavors():
 
             # If there is no source video, then do NOT delete the flavors
             if sourceflavor == None:
-                logging.warning("Video %s has no source video!  Cannot archive source video!" % (entry.id))
+                logging.warning("Video %s has no source video!  Cannot archive source video!" % entry.id)
 
             # If the file is too big to download/upload, then skip
-            if sourceflavor.size > video_size_limit:
+            elif sourceflavor.size > video_size_limit:
                 logging.warning("Source video size %s exceeds limit %s !  Cannot archive source video! %s" % (sourceflavor.size, video_size_limit, entry.id))
-                nid += 1
-                continue
 
-            # But if there is a source video, then archive it and delete all flavors
+            # But if there is a source video that is not too big, then archive it and delete all flavors
             else:
-                # Look ahead to see if this entry_id is already in S3, if it does then skip
+                # Look ahead to see if this entry_id is already in S3, if it does then delete flavors
                 if _S3ObjectExists(s3resource, s3bucketname, entry.id):
+
                     logging.warning("Source file for entry %s already exists in S3!!!" % (entry.id))
-                    nid += 1
-                    continue
 
-                logging.info("Archiving entry: %s" % (entry.id))
-                if not dryrun:
-
-                    try:
-                        logging.debug("Downloading source video from Kaltura ...")
-                        videofile = _downloadVideoFile(sourceflavor)
-
-                        logging.debug("Uploading source video to S3 ...")
-                        s3resource.meta.client.upload_file(videofile, s3bucketname, entry.id)
-
-                        # Catch/handle exceptions???
-                        # Integrity check???
+                    if not dryrun:
 
                         logging.debug("Adding tag %s to Kaltura entry" % (archivedtag))
-                        #_addTag(entry, archivedtag)
-
-                        # Delete local file
-                        os.remove(downloaddir + "/tempvideofile")
+                        _addTag(entry, archivedtag)
 
                         # Delete all flavors including source
                         logging.debug("Deleting all flavors ...")
-                        #_deleteEntryFlavors(entry.id, True)
+                        _deleteEntryFlavors(entry.id, True)
 
                         logging.debug("Uploading placeholder video ...")
-                        #uploadPlaceholder(entry.id)
+                        _uploadPlaceholder(entry.id)
 
-                    except Exception as e:
-                        logging.error("Error encountered: %s" % (str(e)))
+                else:
+                    logging.info("Archiving entry: %s" % (entry.id))
+                    if not dryrun:
+
+                        try:
+                            logging.debug("Downloading source video from Kaltura ...")
+                            videofile = _downloadVideoFile(sourceflavor)
+
+                            logging.debug("Uploading source video to S3 ...")
+                            s3resource.meta.client.upload_file(videofile, s3bucketname, entry.id)
+
+                            # Catch/handle exceptions???
+                            # Integrity check???
+
+                            logging.debug("Adding tag %s to Kaltura entry" % (archivedtag))
+                            _addTag(entry, archivedtag)
+
+                            # Delete local file
+                            os.remove(downloaddir + "/tempvideofile")
+
+                            # Delete all flavors including source
+                            logging.debug("Deleting all flavors ...")
+                            _deleteEntryFlavors(entry.id, True)
+
+                            logging.debug("Uploading placeholder video ...")
+                            _uploadPlaceholder(entry.id)
+
+                        except Exception as e:
+                            logging.error("Error encountered: %s" % (str(e)))
+
 
             nid += 1
 
@@ -235,7 +243,7 @@ def restoreVideos():
 
     # Get the total number of videos
     totalcount = entrylist.totalCount
-    logging.info("Search found %s entries to be archived." % entrylist.totalCount)
+    logging.info("Search found %s entries to be restored." % entrylist.totalCount)
 
     # Loop over the videos
     nid = 1
@@ -284,16 +292,16 @@ def _restoreVideo(entryid):
             _deleteEntryFlavors(entryid, True)
 
             # Upload original video
-            _uploadVideo(filepath)
+            _uploadVideo(entryid, filepath)
 
             os.remove(filepath)
+
+            #TODO: Remove tags from Kaltura entry??
 
     # If the video is not yet available for download from S3, then wait until the next time this script runs
     else:
         logging.info("Video with entry_id %s is not yet available for download from S3" % entryid)
 
-
-    #TODO: Remove tags from Kaltura entry??
 
 
 def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
@@ -304,6 +312,8 @@ def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
     :param categoryid: videos in this category
     :param entryid: id of a specific video
     """
+
+    entryid = "1_6cwwzio0"
 
     # Get list
     filter = KalturaMediaEntryFilter()
@@ -534,14 +544,16 @@ if __name__ == '__main__':
         logging.fatal("Exiting immediately")
         exit(errno.EACCES)
 
-    #deleteFlavors()
+    # Test complete
+    deleteFlavors()
 
-    #archiveFlavors()
+    # Test complete
+    archiveFlavors()
 
     # Initiate retrieval from Glacier before being able to restore
     # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
 
-    #restoreVideos("1_6cwwzio0")
+    restoreVideos()
 
     client.session.end()
 
