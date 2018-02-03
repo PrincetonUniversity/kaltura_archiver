@@ -582,17 +582,15 @@ if __name__ == '__main__':
         exit(errno.EACCES)
 
     # Test complete
-    #deleteFlavors()
+    deleteFlavors()
 
     # Test complete
-    #archiveFlavors()
+    archiveFlavors()
 
     # Initiate retrieval from Glacier before being able to restore
     # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
 
     restoreVideos()
-
-    print("Test = %s" % "foobar".replace("foobar", ""))
 
     client.session.end()
 
