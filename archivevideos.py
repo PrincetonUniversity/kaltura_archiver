@@ -21,7 +21,7 @@ flavorsdeletedtag = "flavors_deleted"
 # Source should be moved to S3 after the video has not been played for this many years
 years2archive = 0
 # The tag that will be applied to videos that have been archived in S3
-archivedtag = "archived_to_S3"
+archivedtag = "archived_to_s3"
 
 # Size limit for source video that will be archived (in KB)
 #video_size_limit = 15000000
@@ -256,7 +256,11 @@ def restoreVideos():
         # Print entry_id, date created, date last played
         for entry in entrylist.objects:
 
-            _restoreVideo(entry.id)
+            # Restore the video to Kaltura
+            #_restoreVideo(entry.id)
+
+            # Remove both tags previously applied
+            _removeTags(entry)
 
             nid += 1
 
@@ -401,11 +405,44 @@ def _getSourceFlavor(entry):
           return None
 
 def _addTag(entry, newtag):
-        mediaEntry = KalturaMediaEntry()
-        mediaEntry.tags = entry.tags + ", " + newtag
+    """
+    Add tag to a video
+    :param entry: Kaltura ID of the video
+    :param newtag: Text of the tag to be added
+    :return:
+    """
+    mediaEntry = KalturaMediaEntry()
+    mediaEntry.tags = entry.tags + ", " + newtag
 
-        if not dryrun:
-            client.media.update(entry.id, mediaEntry)
+    if not dryrun:
+        client.media.update(entry.id, mediaEntry)
+
+def _removeTags(entry):
+    """
+    Remove tag from a video
+    :param entry: Kaltura ID of the video
+    :param tag: Text of the tag to be removed
+    :return:
+    """
+
+    logging.debug("Removing tags from video: %s" % entry.id)
+    mediaEntry = KalturaMediaEntry()
+
+    tags_orig = entry.tags
+
+    # Remove the desired tag regardless of it's position
+    tags_new = tags_orig.replace(", " + flavorsdeletedtag, "")
+    tags_new = tags_new.replace(flavorsdeletedtag + ", ", "")
+    tags_new = tags_new.replace(flavorsdeletedtag, "")
+
+    tags_new = tags_new.replace(", " + archivedtag, "")
+    tags_new = tags_new.replace(archivedtag + ", ", "")
+    tags_new = tags_new.replace(archivedtag, "")
+
+    mediaEntry.tags = tags_new
+
+    if not dryrun:
+        client.media.update(entry.id, mediaEntry)
 
 
 def _downloadVideoFile(sourceflavor):
@@ -545,15 +582,17 @@ if __name__ == '__main__':
         exit(errno.EACCES)
 
     # Test complete
-    deleteFlavors()
+    #deleteFlavors()
 
     # Test complete
-    archiveFlavors()
+    #archiveFlavors()
 
     # Initiate retrieval from Glacier before being able to restore
     # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
 
     restoreVideos()
+
+    print("Test = %s" % "foobar".replace("foobar", ""))
 
     client.session.end()
 
