@@ -10,6 +10,7 @@ from KalturaClient.Plugins.Core import *
 from datetime import datetime
 import calendar
 from dateutil.relativedelta import relativedelta
+from time import sleep
 
 # Whether or not to modify any data
 dryrun = False
@@ -19,9 +20,11 @@ years2deleteflavors = 0
 # The tag that will be applied to videos whose flavors have been deleted
 flavorsdeletedtag = "flavors_deleted"
 # Source should be moved to S3 after the video has not been played for this many years
-years2archive = 0
+years2archive = 1
 # The tag that will be applied to videos that have been archived in S3
 archivedtag = "archived_to_s3"
+# The tag that will be applied to all videos that have been restored from S3
+restoredtag = "restored_from_s3"
 
 # Size limit for source video that will be archived (in KB)
 #video_size_limit = 15000000
@@ -257,10 +260,17 @@ def restoreVideos():
         for entry in entrylist.objects:
 
             # Restore the video to Kaltura
-            #_restoreVideo(entry.id)
+            was_restored = _restoreVideo(entry.id)
 
-            # Remove both tags previously applied
-            _removeTags(entry)
+            # If the video was fully restored to Kaltura, rather than just a restore request initiated with Glacier
+            if was_restored:
+
+                # Remove both tags previously applied
+                _removeTags(entry)
+
+                #TODO:  need to refresh the "entry" object to get the updated tags string before making another update
+                # Add tag indicating the video has been restored
+                _addTag(entry, restoredtag)
 
             nid += 1
 
@@ -300,11 +310,13 @@ def _restoreVideo(entryid):
 
             os.remove(filepath)
 
-            #TODO: Remove tags from Kaltura entry??
+            return True
 
     # If the video is not yet available for download from S3, then wait until the next time this script runs
     else:
         logging.info("Video with entry_id %s is not yet available for download from S3" % entryid)
+
+        return False
 
 
 
@@ -317,6 +329,7 @@ def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
     :param entryid: id of a specific video
     """
 
+    #TODO:  delete this after testing
     entryid = "1_6cwwzio0"
 
     # Get list
@@ -336,31 +349,27 @@ def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
         # If the string begins with an exclamation, set the NOT comparison to true and remove the exclamation
         if tag.startswith("!"):
             tagfilter.not_ = True
-            tag = tag[1:]
+            tagfilter.value = tag[1:]
 
-        tagfilter.value = tag
+        else:
+            tagfilter.value = tag
 
         tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
 
         filter.advancedSearch = tagfilter
-
-        #filter.tagsLike = "!" + tag
 
     if yearssinceplay is not None:
         old_date = datetime.now()
         d = old_date - relativedelta(years=yearssinceplay)
         timestamp = calendar.timegm(d.utctimetuple())
 
-        # Created prior to this date
-        #filter.createdAtLessThanOrEqual = timestamp
+        # If looking for videos that have NOT already been deleted/archived
+        if tag.startswith("!"):
+            filter.lastPlayedAtLessThanOrEqual = timestamp
 
-        # And not played since this date
-        #filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-        #filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
-        #filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
-        #filter.advancedSearch.value = timestamp
-
-        filter.lastPlayedAtLessThanOrEqual = timestamp
+        # If looking for videos that HAVE already been archived, then we must be looking to restore
+        else:
+            filter.lastPlayedAtGreaterThanOrEqual = timestamp
 
     if categoryid is not None:
         filter.categoryAncestorIdIn = categoryid
@@ -411,11 +420,18 @@ def _addTag(entry, newtag):
     :param newtag: Text of the tag to be added
     :return:
     """
+
+    logging.info("Adding tag %s from video: %s" % (newtag, entry.id))
     mediaEntry = KalturaMediaEntry()
-    mediaEntry.tags = entry.tags + ", " + newtag
+
+    tags_new = entry.tags + ", " + newtag
+    mediaEntry.tags = tags_new
 
     if not dryrun:
         client.media.update(entry.id, mediaEntry)
+
+    # Set the tags on this object instance so that any subsequent operations have the latest version
+    entry.tags = tags_new
 
 def _removeTags(entry):
     """
@@ -425,7 +441,7 @@ def _removeTags(entry):
     :return:
     """
 
-    logging.debug("Removing tags from video: %s" % entry.id)
+    logging.info("Removing tags from video: %s" % entry.id)
     mediaEntry = KalturaMediaEntry()
 
     tags_orig = entry.tags
@@ -444,6 +460,8 @@ def _removeTags(entry):
     if not dryrun:
         client.media.update(entry.id, mediaEntry)
 
+    # Set the tags on this object instance so that any subsequent operations have the latest version
+    entry.tags = tags_new
 
 def _downloadVideoFile(sourceflavor):
     #print("\n".join(map(str, flavorassets)))
@@ -538,20 +556,23 @@ def _uploadVideo(entryid, filepath):
 
   # Upload the file to Kaltura and re-link it to the media entry
 
-  logging.debug("Uploading video to Kaltura entry: %s" % (entryid))
+    logging.debug("Uploading video to Kaltura entry: %s" % (entryid))
 
-  if not dryrun:
-      uploadToken = KalturaUploadToken()
-      uploadToken = client.uploadToken.add(uploadToken)
+    if not dryrun:
+        uploadToken = KalturaUploadToken()
+        uploadToken = client.uploadToken.add(uploadToken)
 
-      ulfile = file(filepath)
+        ulfile = file(filepath)
 
-      client.uploadToken.upload(uploadToken.id, ulfile)
+        client.uploadToken.upload(uploadToken.id, ulfile)
 
-      uploadedFileTokenResource = KalturaUploadedFileTokenResource()
-      uploadedFileTokenResource.token = uploadToken.id
+        uploadedFileTokenResource = KalturaUploadedFileTokenResource()
+        uploadedFileTokenResource.token = uploadToken.id
 
-      client.media.addContent(entryid, uploadedFileTokenResource)
+        client.media.addContent(entryid, uploadedFileTokenResource)
+
+        # Set new thumbnail from the 1st second of the new video
+        client.media.updateThumbnail(entryid, 1)
 
 
 #######
@@ -582,10 +603,10 @@ if __name__ == '__main__':
         exit(errno.EACCES)
 
     # Test complete
-    deleteFlavors()
+    #deleteFlavors()
 
     # Test complete
-    archiveFlavors()
+    #archiveFlavors()
 
     # Initiate retrieval from Glacier before being able to restore
     # See https://thomassileo.name/blog/2012/10/24/getting-started-with-boto-and-glacier/
