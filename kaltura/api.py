@@ -6,19 +6,19 @@ from dateutil.relativedelta import relativedelta
 import calendar
 import logging
 
-def startsession(partnerId, userId, secret):
+def startsession(partner_id, user_id, secret):
     """ Use configuration to generate KS
     """
-    config = KalturaConfiguration(partnerId)
+    config = KalturaConfiguration(partner_id)
     config.serviceUrl = "https://www.kaltura.com/"
     client = KalturaClient(config)
     ktype = KalturaSessionType.ADMIN
     expiry = 432000 # 432000 = 5 days
     privileges = "disableentitlement"
 
-    ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
+    ks = client.session.start(secret, user_id, ktype, partner_id, expiry, privileges)
     client.setKs(ks)
-    logging.debug("Kaltura/Api: connected with %s %s" % (userId, partnerId))
+    logging.debug("Kaltura/Api: connected to %s with %s partnerId:%s" % (config.serviceUrl, user_id, partner_id))
     return client
 
 class Filter:
