@@ -1,25 +1,26 @@
-from KalturaClient import *
-from KalturaClient.Plugins.Core import *
 
 import logging, traceback
 from argparse import RawDescriptionHelpFormatter
 import envvars
 import sys
+import kaltura
+
 
 _A_CONNECT = 'connect'
 _A_ERROR = 'unimplemented'
 
 class KalturaArgParser(envvars.ArgumentParser):
-
-    KALTURA_ENV_VARS = { 'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
-                      'secret': 'KALTURA_SECRET|Kaltura Secret to access API|',
-                      'userId': 'KALTURA_USERID|Kaltura User Id|'}
+    ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
+                        'secret': 'KALTURA_SECRET|Kaltura Secret to access API|',
+                        'userId': 'KALTURA_USERID|Kaltura User Id|',
+                        'awsAccessKey': 'AWS_ACCESS_KEY_ID|AWS access Key Id|',
+                        'awsAccessSecret': 'AWS_SECRET_ACCESS_KEY|AWS secret access key|'}
 
     DESCRIPTION = """
-         do stuff with Kaltura Admin API
+do stuff with Kaltura Admin API
 
-         The script uses the following environment variables
-    """
+The script uses the following environment variables
+"""
 
 
     ACTIONS = [_A_CONNECT, _A_ERROR]
@@ -27,7 +28,7 @@ class KalturaArgParser(envvars.ArgumentParser):
     @staticmethod
     def create(description=DESCRIPTION):
 
-        evars = envvars.to_doc(KalturaArgParser.KALTURA_ENV_VARS)
+        evars = envvars.to_doc(KalturaArgParser.ENV_VARS)
         for k in evars:
             description = description + "\n\t%-15s:  %s" % (k, evars[k])
 
@@ -40,28 +41,10 @@ class KalturaArgParser(envvars.ArgumentParser):
 
 
 def check_env():
-    env = envvars.to_value(KalturaArgParser.KALTURA_ENV_VARS)
+    env = envvars.to_value(KalturaArgParser.ENV_VARS)
     for v in env:
-        logging.info("%s=%s" % (v, '***' if v == "secret" else env[v]))
-    if len(env) < len(KalturaArgParser.KALTURA_ENV_VARS):
-        raise RuntimeError("Missing environment variable/s")
+        logging.info("%s=%s" % (v, '***' if "SECRET" in v.upper() else env[v]))
     return env
-
-
-
-def startsession(partnerId, userId, secret):
-    """ Use configuration to generate KS
-    """
-    config = KalturaConfiguration(partnerId)
-    config.serviceUrl = "https://www.kaltura.com/"
-    client = KalturaClient(config)
-    ktype = KalturaSessionType.ADMIN
-    expiry = 432000 # 432000 = 5 days
-    privileges = "disableentitlement"
-
-    ks = client.session.start(secret, userId, ktype, partnerId, expiry, privileges)
-    client.setKs(ks)
-    return client
 
 
 def main(args):
@@ -72,7 +55,7 @@ def main(args):
     print(args)
     action = args['action']
     if (action == _A_CONNECT):
-        cl = startsession(partnerId=args['partnerId'], userId=args['userId'],  secret=args['secret'])
+        cl = kaltura.api.startsession(partnerId=args['partnerId'], userId=args['userId'],  secret=args['secret'])
         logging.info(cl)
     else:
         raise RuntimeError("action '%s' not yet implemented" % action)
@@ -85,7 +68,8 @@ if __name__ == '__main__':
         main(vars(args))
         sys.exit(0)
     except Exception as e:
-        print("")
+        print(e)
         parser.print_usage()
-        #traceback.print_exc()
+        if (not isinstance(e, RuntimeError)):
+                traceback.print_exc()
         sys.exit(1)
