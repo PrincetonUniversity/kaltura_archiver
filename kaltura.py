@@ -5,7 +5,6 @@ import envvars
 import sys
 import kaltura
 
-
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
                         'secret': 'KALTURA_SECRET|Kaltura Secret to access API|',
@@ -31,24 +30,33 @@ It  uses the following environment variables
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
-        subparsers.add_parser('connect', help='test access to Kaltra KMC and AWS').set_defaults(func=connect)
+        subparsers.add_parser('connect', help='test access to Kaltura KMC and AWS').set_defaults(func=connect)
 
-        subparser = subparsers.add_parser('list', help='test access to Kaltra KMC and AWS')
+        subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
-        subparser.add_argument("--unplayed", "-u",  help="unplayed for given number of years")
+        subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
+        subparser.add_argument("--noLastPlayed", "-n",  type=int, help="undefined LAST_PLAYED_AT attribute")
         subparser.set_defaults(func=list)
 
         return parser
 
 def connect(params):
-    cl = kaltura.api.startsession(partnerId=params['partnerId'], userId=params['userId'],  secret=params['secret'])
-    logging.info(cl)
+    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+    logging.info(client)
+
+from KalturaClient.Plugins.Core import *
 
 def list(params):
+    if (params['unplayed']  and params['noLastPlayed']):
+        raise RuntimeError("can't uses both arguments: 'unplayed' and 'noLastPlayed'")
+    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+
     filter = kaltura.api.Filter()
     filter.tag(params['tag']).category(params['category']).years_since_played(params['unplayed'])
     logging.info("list %s" % str(filter))
+    kaltura.api.loop(filter)
+
 
 def todo(params):
     logging.info("todo %s" % str(params))
@@ -71,13 +79,13 @@ def _main(args):
 
 if __name__ == '__main__':
     parser = KalturaArgParser.create()
-    args = parser.parse_args()
     try:
+        args = parser.parse_args()
         _main(vars(args))
         sys.exit(0)
     except Exception as e:
-        print(e)
+        print("\n" + str(e) + "\n")
         parser.print_usage()
         if (not isinstance(e, RuntimeError)):
-                traceback.print_exc()
-        sys.exit(1)
+            traceback.print_exc()
+        sys.exit(-1)
