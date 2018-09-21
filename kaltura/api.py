@@ -21,27 +21,63 @@ def startsession(partnerId, userId, secret):
     logging.debug("Kaltura/Api: connected with %s %s" % (userId, partnerId))
     return client
 
+class Filter:
+    def __init__(self, mediaType=KalturaMediaType.VIDEO):
+        self.filter = KalturaMediaEntryFilter()
+        self.filter.mediaTypeEqual = mediaType
+        self.filter.orderBy = "+createdAt"  # Oldest first
 
-def filterOlderThan(yearssinceplay, tag=None, categoryid=None, mediaType=KalturaMediaType.VIDEO):
-    filter = KalturaMediaEntryFilter()
-    filter.mediaTypeEqual = mediaType
+    def tag(self, tag):
+        if (tag != None):
+            self.filter.tagLike = "!" + tag
+            logging.debug("Filter.tag=%s" % self.filter.tagLike )
+        else:
+            logging.warn("Filter.tag: NOOP ")
+        return self
 
-    filter.orderBy = "+createdAt"  # Oldest first
+    def category(self, categoryId):
+        if (categoryId != None):
+            self.filter.categoryAncestorIdIn = categoryId
+            logging.debug("Filter.tag=%s" % self.filter.categoryAncestorIdIn.to_s )
+        else:
+            logging.warn("Filter.category: NOOP")
+        return self
 
-    if tag is not None:
-        filter.tagsLike = "!" + tag
+    def undefined_LAST_PLAYED_AT(self):
+        self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
+        self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
+        self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.EQUAL
+        self.filter.advancedSearch.value = None
+        logging.debug("Filter.LAST_PLAYED_AT=None")
+        hasattr(f, 't')
 
-    if yearssinceplay is not None:
-        filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-        filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
-        filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
-        old_date = datetime.now()
-        d = old_date - relativedelta(years=yearssinceplay)
-        timestamp = calendar.timegm(d.utctimetuple())
-        filter.advancedSearch.value = timestamp
+    def years_since_played(self, years):
+        if years is not None:
+            self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
+            self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
+            self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
+            d = datetime.now() - relativedelta(years=years)
+            timestamp = calendar.timegm(d.utctimetuple())
+            self.filter.advancedSearch.value = timestamp
+            logging.debug("Filter.LAST_PLAYED_AT LESS_THAN {:%d, %b %Y}".format(d) )
+        else:
+            logging.warn("Filter.yearsSincePlayed: NOOP")
+        return self
 
-    if categoryid is not None:
-        filter.categoryAncestorIdIn = categoryid
+    def _str__(self):
+        s = "Filter("
+        for a in dir(self.filter):
+            if (self.filter.__getattribute__(a) != NotImplemented):
+                s = "%s %s=%s" % (s, a, self.filter.__getattribute__(a))
+        return s + ")"
 
-    return filter
-
+    def __str__(self):
+        s = "Filter("
+        if hasattr(self.filter, 'tagLike'):
+            s = s + "tag=%s" % self.filter.tagLike
+        if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
+            s = s + "category=%s" % self.filter.categoryAncestorIdIn
+        if hasattr(self.filter, 'advancedSearch') and  self.filter.advancedSearch != NotImplemented:
+                s = s + "search: %s %d %s" % \
+                    ( self.filter.advancedSearch.attribute, self.filter.advancedSearch.comparison, str(self.filter.advancedSearch.value) )
+        return s + ')'
