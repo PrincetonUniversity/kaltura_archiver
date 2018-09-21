@@ -40,22 +40,22 @@ The script uses the following environment variables
         return parser
 
 
-def check_env():
+def _get_env_vars():
     env = envvars.to_value(KalturaArgParser.ENV_VARS)
     for v in env:
         logging.info("%s=%s" % (v, '***' if "SECRET" in v.upper() else env[v]))
     return env
 
 
-def main(args):
-    print(args)
+def _main(args):
     if 'loglevel' in args:
         logging.getLogger().setLevel(args['loglevel'])
-    args.update(check_env())
     print(args)
-    action = args['action']
+    params = _get_env_vars()
+    params.update(args)
+    action = params['action']
     if (action == _A_CONNECT):
-        cl = kaltura.api.startsession(partnerId=args['partnerId'], userId=args['userId'],  secret=args['secret'])
+        cl = kaltura.api.startsession(partnerId=params['partnerId'], userId=params['userId'],  secret=params['secret'])
         logging.info(cl)
     else:
         raise RuntimeError("action '%s' not yet implemented" % action)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
     parser = KalturaArgParser.create()
     args = parser.parse_args()
     try:
-        main(vars(args))
+        _main(vars(args))
         sys.exit(0)
     except Exception as e:
         print(e)
