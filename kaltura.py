@@ -6,9 +6,6 @@ import sys
 import kaltura
 
 
-_A_CONNECT = 'connect'
-_A_ERROR = 'unimplemented'
-
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
                         'secret': 'KALTURA_SECRET|Kaltura Secret to access API|',
@@ -16,14 +13,10 @@ class KalturaArgParser(envvars.ArgumentParser):
                         'awsAccessKey': 'AWS_ACCESS_KEY_ID|AWS access Key Id|',
                         'awsAccessSecret': 'AWS_SECRET_ACCESS_KEY|AWS secret access key|'}
 
-    DESCRIPTION = """
-do stuff with Kaltura Admin API
+    DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, archive and restore videos to and from AWS storage.
 
-The script uses the following environment variables
+It  uses the following environment variables
 """
-
-
-    ACTIONS = [_A_CONNECT, _A_ERROR]
 
     @staticmethod
     def create(description=DESCRIPTION):
@@ -34,11 +27,31 @@ The script uses the following environment variables
 
         loglevels = ['CRITICAL', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'NOTSET']
         parser = KalturaArgParser(description=description, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("--action", "-a",  choices=KalturaArgParser.ACTIONS, default='connect', help="action to perform")
         parser.add_argument("--loglevel", "-l", choices=loglevels,  default=logging.INFO, help="log level  - default: INFO")
+
+        subparsers = parser.add_subparsers(help='sub-command help')
+
+        subparsers.add_parser('connect', help='test access to Kaltra KMC and AWS').set_defaults(func=connect)
+
+        subparser = subparsers.add_parser('list', help='test access to Kaltra KMC and AWS')
+        subparser.add_argument("--category", "-c",  help="kaltura category")
+        subparser.add_argument("--tag", "-t",  help="kaltura tag")
+        subparser.add_argument("--unplayed", "-u",  help="unplayed for given number of years")
+        subparser.set_defaults(func=list)
 
         return parser
 
+def connect(params):
+    cl = kaltura.api.startsession(partnerId=params['partnerId'], userId=params['userId'],  secret=params['secret'])
+    logging.info(cl)
+
+def list(params):
+    filter = kaltura.api.Filter()
+    filter.tag(params['tag']).category(params['category']).years_since_played(params['unplayed'])
+    logging.info("list %s" % str(filter))
+
+def todo(params):
+    logging.info("todo %s" % str(params))
 
 def _get_env_vars():
     env = envvars.to_value(KalturaArgParser.ENV_VARS)
@@ -53,13 +66,8 @@ def _main(args):
     print(args)
     params = _get_env_vars()
     params.update(args)
-    action = params['action']
-    if (action == _A_CONNECT):
-        cl = kaltura.api.startsession(partnerId=params['partnerId'], userId=params['userId'],  secret=params['secret'])
-        logging.info(cl)
-    else:
-        raise RuntimeError("action '%s' not yet implemented" % action)
-
+    print(params)
+    params['func'](params)
 
 if __name__ == '__main__':
     parser = KalturaArgParser.create()
