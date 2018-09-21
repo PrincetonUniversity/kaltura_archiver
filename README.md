@@ -1,17 +1,18 @@
 Kaltura
 =======
 
-Scripts written to administer content within the  Kaltura video asset management system.
+The script [kaltura.py](kaltura.py) uses an action parameter. It can simply try to connect to the kaltura server,
+list certain videos, backup/restore videos to AWS storage, 
+or replace backed up videos with a placeholder video in the kaltura server
 
+[kaltura.py](kaltura.py) relies on environment variables to authenticate against the Kaltura KMC  and AWS. 
 
-## Environment Variables 
+Edit the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) set the relevant environment variables. 
 
-Scripts rely on environment variables to authenticate against the Kaltura KMC 
+Use [kaltura.py](kaltura.py)'s help option for further documentation 
 
 ~~~
-KALTURA_PARTNERID
-KALTURA_SECRET
-KALTURA_USERID
+python kaltura.py --help 
 ~~~
 
 ## Installation
