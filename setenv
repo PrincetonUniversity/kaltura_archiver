@@ -1,8 +1,0 @@
-# Kaltura KMC keys
-export KALTURA_PARTNERID=
-export KALTURA_SECRET=
-export KALTURA_USERID=
-
-# S3 bucket keys
-export AWS_ACCESS_KEY_ID=
-export AWS_SECRET_ACCESS_KEY=

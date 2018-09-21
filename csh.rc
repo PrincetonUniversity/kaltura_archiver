@@ -1,0 +1,5 @@
+setenv    KALTURA_USERID  email
+setenv    KALTURA_PARTNERID  ID
+setenv    KALTURA_SECRET  secret
+
+
