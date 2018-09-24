@@ -27,26 +27,10 @@ def startsession(partner_id, user_id, secret):
     client.setKs(ks)
     logging.info("Kaltura/Api: connected to %s with %s partnerId:%s" % (config.serviceUrl, user_id, partner_id))
     __client__ = client
-    print(client)
     return None
 
-def loop(filter):
-    # iterate over filtered videos
-    client = getClient()
-
-    PAGER_CHUNK = 10
-    pager = KalturaFilterPager()
-    pager.pageSize = PAGER_CHUNK
-    pager.pageIndex = 0
-    while (True):
-        pager.setPageIndex(pager.getPageIndex() + 1)
-        print("page %d" % pager.getPageIndex())
-        entrylist = client.media.list(filter.filter, pager)
-        if (not entrylist.objects):
-            break
-        for entry in entrylist.objects:
-            print(str(MediaEntry.props(entry)))
-    pass
+from KalturaClient import *
+from KalturaClient.Plugins.Core import *
 
 class Filter:
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
@@ -91,6 +75,9 @@ class Filter:
             logging.debug("Filter.yearsSincePlayed: NOOP")
         return self
 
+    def __iter__(self):
+        return FilterIter(self)
+
     def __str__(self):
         s = "Filter("
         if hasattr(self.filter, 'tagLike'):
@@ -98,9 +85,29 @@ class Filter:
         if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
             s = s + "category=%s" % self.filter.categoryAncestorIdIn
         if hasattr(self.filter, 'advancedSearch') and  self.filter.advancedSearch != NotImplemented:
-                s = s + "search: %s %s %s" % \
-                    ( self.filter.advancedSearch.attribute, self.filter.advancedSearch.comparison, str(self.filter.advancedSearch.value) )
+            s = s + "search: %s %s %s" % \
+                ( self.filter.advancedSearch.attribute, self.filter.advancedSearch.comparison, str(self.filter.advancedSearch.value) )
         return s + ')'
+
+class FilterIter:
+    PAGER_CHUNK = 10
+
+    def __init__(self, filter):
+        self.filter = filter
+        self.pager = KalturaFilterPager()
+        self.pager.pageSize = FilterIter.PAGER_CHUNK
+        self.pager.pageIndex = 0
+        self.objects = iter([])
+
+    def next(self):
+        try:
+            n = next(self.objects)
+            return n;
+        except StopIteration as stp:
+            self.pager.setPageIndex(self.pager.getPageIndex() + 1)
+            self.objects = iter(getClient().media.list(self.filter.filter, self.pager).objects)
+            logging.debug("%s: iter page %d" % (self, self.pager.getPageIndex()))
+            return next(self.objects)
 
 class MediaEntry:
 

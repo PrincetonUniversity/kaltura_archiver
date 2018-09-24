@@ -3,6 +3,7 @@ import logging, traceback
 from argparse import RawDescriptionHelpFormatter
 import envvars
 import sys
+
 import kaltura
 
 class KalturaArgParser(envvars.ArgumentParser):
@@ -56,7 +57,11 @@ def list(params):
     if (params['noLastPlayed']) :
             filter.undefined_LAST_PLAYED_AT();
     logging.info("list %s" % str(filter))
-    kaltura.api.loop(filter)
+
+    columns = ['id', 'views', 'lastPlayedAt']
+    print('\t'.join(columns))
+    for entry in filter:
+        print("\t".join([str(v) for v in kaltura.MediaEntry.values(entry, columns)]))
 
 
 def todo(params):
@@ -72,10 +77,10 @@ def _get_env_vars():
 def _main(args):
     if 'loglevel' in args:
         logging.getLogger().setLevel(args['loglevel'])
-    print(args)
+    logging.info(args)
     params = _get_env_vars()
     params.update(args)
-    print(params)
+    #print(params)
     params['func'](params)
 
 if __name__ == '__main__':
@@ -87,6 +92,6 @@ if __name__ == '__main__':
     except Exception as e:
         print("\n" + str(e) + "\n")
         parser.print_usage()
-        if (not isinstance(e, RuntimeError)):
+        if (True or not isinstance(e, RuntimeError)):
             traceback.print_exc()
         sys.exit(-1)
