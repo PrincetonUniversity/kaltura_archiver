@@ -71,14 +71,15 @@ class Filter:
         return self
 
     def undefined_LAST_PLAYED_AT(self):
-        self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-        self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
-        self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.EQUAL
-        self.filter.advancedSearch.value = NotImplemented
-        logging.debug("Filter.LAST_PLAYED_AT=None")
+        if (self.filter.advancedSearch != NotImplemented):
+            raise RuntimeError("undefined_LAST_PLAYED_AT: filter.advancedSearch already defined")
+            logging.debug("Filter.undefined_LAST_PLAYED_AT" )
+            return self.years_since_played(20)
 
     def years_since_played(self, years):
         if years is not None:
+            if (self.filter.advancedSearch != NotImplemented):
+                raise RuntimeError("years_since_played: filter.advancedSearch already defined")
             self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
             self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
             self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN

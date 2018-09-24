@@ -48,12 +48,13 @@ def connect(params):
 from KalturaClient.Plugins.Core import *
 
 def list(params):
-    if (params['unplayed']  and params['noLastPlayed']):
-        raise RuntimeError("can't uses both arguments: 'unplayed' and 'noLastPlayed'")
-    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+
+    kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
 
     filter = kaltura.api.Filter()
-    filter.tag(params['tag']).category(params['category']).years_since_played(params['unplayed'])
+    filter.tag(params['tag']).category(params['category']).years_since_played(params['unplayed']);
+    if (params['noLastPlayed']) :
+            filter.undefined_LAST_PLAYED_AT();
     logging.info("list %s" % str(filter))
     kaltura.api.loop(filter)
 
