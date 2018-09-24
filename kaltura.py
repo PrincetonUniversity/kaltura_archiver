@@ -36,7 +36,9 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
+        subparser.add_argument("--id", "-i",  help="kaltura media entry id")
         subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
+        subparser.add_argument("--played", "-p",  type=int, help="played within the the given number of years")
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         subparser.set_defaults(func=list)
 
@@ -46,19 +48,19 @@ def connect(params):
     client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
     logging.info(client)
 
-from KalturaClient.Plugins.Core import *
 
 def list(params):
 
     kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
 
     filter = kaltura.api.Filter()
-    filter.tag(params['tag']).category(params['category']).years_since_played(params['unplayed']);
+    filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
+    filter.years_since_played(params['unplayed']).played_within_years(params['played'])
     if (params['noLastPlayed']) :
             filter.undefined_LAST_PLAYED_AT();
     logging.info("list %s" % str(filter))
 
-    columns = ['id', 'views', 'lastPlayedAt']
+    columns = ['id', 'views', 'lastPlayedDate', 'lastPlayedAt', 'categories', 'categoriesIds', 'tags']
     print('\t'.join(columns))
     for entry in filter:
         print("\t".join([str(v) for v in kaltura.MediaEntry.values(entry, columns)]))
