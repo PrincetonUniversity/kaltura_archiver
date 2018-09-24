@@ -91,13 +91,6 @@ class Filter:
             logging.debug("Filter.yearsSincePlayed: NOOP")
         return self
 
-    def _str__(self):
-        s = "Filter("
-        for a in dir(self.filter):
-            if (self.filter.__getattribute__(a) != NotImplemented):
-                s = "%s %s=%s" % (s, a, self.filter.__getattribute__(a))
-        return s + ")"
-
     def __str__(self):
         s = "Filter("
         if hasattr(self.filter, 'tagLike'):
