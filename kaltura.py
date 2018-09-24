@@ -36,7 +36,7 @@ It  uses the following environment variables
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
-        subparser.add_argument("--noLastPlayed", "-n",  type=int, help="undefined LAST_PLAYED_AT attribute")
+        subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         subparser.set_defaults(func=list)
 
         return parser
