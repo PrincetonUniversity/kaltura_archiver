@@ -1,4 +1,4 @@
 import mediaentry
 import api
 
-from mediaentry import MediaEntry
+from mediaentry import MediaEntry, FlavorAssetIterator
