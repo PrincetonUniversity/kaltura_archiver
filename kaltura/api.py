@@ -1,10 +1,10 @@
-from KalturaClient import *
-from KalturaClient.Plugins.Core import *
-
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import calendar
 import logging
+
+from KalturaClient import *
+from KalturaClient.Plugins.Core import *
 
 import mediaentry
 
@@ -31,8 +31,6 @@ def startsession(partner_id, user_id, secret):
     __client__ = client
     return None
 
-from KalturaClient import *
-from KalturaClient.Plugins.Core import *
 
 class Filter:
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
@@ -64,10 +62,14 @@ class Filter:
 
         NOOP if tag == None
 
+        not compatible wih undefined_LAST_PLAYED_AT method
+
         :param tag: kaltura media entry tag
         :return: self
         """
         if (tag != None):
+            if (self.filter.advancedSearch != NotImplemented):
+                raise RuntimeError("tag: filter.advancedSearch already defined")
             tagfilter = KalturaMediaEntryMatchAttributeCondition()
             # if tag start with '|' look for non matching entries
             if tag.startswith("!"):
@@ -78,9 +80,26 @@ class Filter:
                 tagfilter.value = tag
             tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
             self.filter.advancedSearch = tagfilter
-            logging.debug('Filter.category={} {}'.format(tagfilter.not_, tagfilter.value))
+            logging.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
         else:
             logging.debug("Filter.tag: NONE" )
+        return self
+
+    def undefined_LAST_PLAYED_AT(self):
+        """
+        matches videos that do not have a lastPlayedAt property
+
+        not compatible wih tag method
+
+        :return: self
+        """
+        if (self.filter.advancedSearch != NotImplemented):
+            raise RuntimeError("undefined_LAST_PLAYED_AT: filter.advancedSearch already defined")
+        self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
+        self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
+        self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
+        self.filter.advancedSearch.value = Filter._years_ago(20)
+        logging.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(mediaentry.playedDate(self.filter.advancedSearch.value)) )
         return self
 
     def category(self, categoryId):
@@ -99,13 +118,6 @@ class Filter:
             logging.debug("Filter.category: NOOP")
         return self
 
-    def undefined_LAST_PLAYED_AT(self):
-        if (self.filter.advancedSearch != NotImplemented):
-            raise RuntimeError("undefined_LAST_PLAYED_AT: filter.advancedSearch already defined")
-        logging.debug("Filter.undefined_LAST_PLAYED_AT" )
-        # not played for 20 years
-        return self.years_since_played(20)
-
     def years_since_played(self, years):
         return self._since_played('lastPlayedAtLessThanOrEqual', years)
 
@@ -123,31 +135,50 @@ class Filter:
         :return: self
         """
         if years is not None:
-            # compute unix standard time of now() - years
-            d = datetime.now() - relativedelta(years=years)
-            timestamp = calendar.timegm(d.utctimetuple())
             if (mode == 'lastPlayedAtLessThanOrEqual'):
-                self.filter.lastPlayedAtLessThanOrEqual = timestamp
+                self.filter.lastPlayedAtLessThanOrEqual = Filter._years_ago(years)
             elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
-                self.filter.lastPlayedAtGreaterThanOrEqual = timestamp
-            logging.debug("Filter.{:s} {:%d, %b %Y}".format(mode, d) )
+                self.filter.lastPlayedAtGreaterThanOrEqual = Filter._years_ago(years)
+            logging.debug("Filter.{:s} {:%d %b %Y}".format(mode, d) )
         else:
             logging.debug("Filter.{:s}: NOOP".format(mode))
         return self
+
+    @staticmethod
+    def _years_ago(years):
+        """
+        :param years: number of years
+        :return: return   unix standard time of now() - years
+
+        """
+        d = datetime.now() - relativedelta(years=years)
+        return calendar.timegm(d.utctimetuple())
 
     def __iter__(self):
         return FilterIter(self)
 
     def __str__(self):
         s = "Filter("
-        if hasattr(self.filter, 'idEqual'):
+        if self.filter.idEqual != NotImplemented:
             s = s + "idEqual=%s " % self.filter.idEqual
+
+        if self.filter.lastPlayedAtGreaterThanOrEqual != NotImplemented:
+            s = s + "lastPlayed >= {} ".format(mediaentry.playedDate(self.filter.lastPlayedAtGreaterThanOrEqual))
+
+        if self.filter.lastPlayedAtLessThanOrEqual != NotImplemented:
+            s = s + "lastPlayed <= {} ".format(mediaentry.playedDate(self.filter.lastPlayedAtLessThanOrEqual))
+
         if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
-            s = s + "category=%s " % self.filter.categoryAncestorIdIn
-        if hasattr(self.filter, 'advancedSearch') and  self.filter.advancedSearch != NotImplemented:
-            adv = self.filter.advancedSearch
-            if (isinstance(adv, KalturaMediaEntryMatchAttributeCondition)):
-                s = s + ("tag: {}{}".format("!" if adv.not_ else "", adv.value))
+            s = s + "category={} ".format(self.filter.categoryAncestorIdIn)
+
+        adv = self.filter.advancedSearch
+        if  adv != NotImplemented:
+            if isinstance(adv, KalturaMediaEntryMatchAttributeCondition) and adv.attribute == KalturaMediaEntryMatchAttribute.TAGS:
+                    s = s + "tag: {}{}".format("!" if adv.not_ else "", adv.value)
+            elif isinstance(adv,KalturaMediaEntryCompareAttributeCondition)  and adv.attribute == KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT:
+                    s = s + "undefPlayedAt-last >= {}".format(mediaentry.playedDate(adv.value))
+            else:
+                    s = s + "bad advancedSearch"
         return s + ')'
 
 class FilterIter:
