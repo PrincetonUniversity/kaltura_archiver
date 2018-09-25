@@ -50,8 +50,15 @@ def connect(params):
 
 
 def list(params):
+    """
+    print matching kaltura records
 
-    kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+    run kaltura.py list --help to get a list of available searcj filter options
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    connect(params)
 
     filter = kaltura.api.Filter()
     filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
@@ -64,7 +71,7 @@ def list(params):
     print('\t'.join(columns))
     for entry in filter:
         print("\t".join([str(v) for v in kaltura.MediaEntry.values(entry, columns)]))
-
+    return None
 
 def todo(params):
     logging.info("todo %s" % str(params))

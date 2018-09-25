@@ -41,6 +41,14 @@ class Filter:
         self.filter.orderBy = "+createdAt"  # Oldest first
 
     def entry_id(self, entryid):
+        """
+        filter on entryid being equal
+
+        NOOP if entryid == None
+
+        :param entryid: kaltura media entry id
+        :return: self
+        """
         if entryid is not None:
             self.filter.idEqual = entryid
             logging.debug("Filter.id=%s" % self.filter.idEqual)
@@ -49,6 +57,16 @@ class Filter:
         return self
 
     def tag(self, tag):
+        """
+        if tag does not start with '!' match if it (partially) matches kaltura media entry tag
+
+        otherwise reverse matching result
+
+        NOOP if tag == None
+
+        :param tag: kaltura media entry tag
+        :return: self
+        """
         if (tag != None):
             tagfilter = KalturaMediaEntryMatchAttributeCondition()
             # if tag start with '|' look for non matching entries
@@ -66,6 +84,14 @@ class Filter:
         return self
 
     def category(self, categoryId):
+        """
+        match if given categoryId is in a media entrys' category id list
+
+        NOOP if categoryId == None
+
+        :param categoryId: kaltura media entry category id
+        :return: self
+        """
         if (categoryId != None):
             self.filter.categoryAncestorIdIn = categoryId
             logging.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
@@ -87,6 +113,15 @@ class Filter:
         return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
 
     def _since_played(self, mode, years):
+        """
+        match if video was was not last played since /within the last years
+
+        NOOP if years == None
+
+        :param mode:  lastPlayedAtLessThanOrEqual or lastPlayedAtGreaterThanOrEqual
+        :param years: number of years
+        :return: self
+        """
         if years is not None:
             # compute unix standard time of now() - years
             d = datetime.now() - relativedelta(years=years)
@@ -105,16 +140,14 @@ class Filter:
 
     def __str__(self):
         s = "Filter("
-        if hasattr(self.filter, 'entryId'):
-            s = s + "entryId=%s" % self.filter.idEqual
-        if hasattr(self.filter, 'tagLike'):
-            s = s + "tag=%s" % self.filter.tagLike
+        if hasattr(self.filter, 'idEqual'):
+            s = s + "idEqual=%s " % self.filter.idEqual
         if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
-            s = s + "category=%s" % self.filter.categoryAncestorIdIn
+            s = s + "category=%s " % self.filter.categoryAncestorIdIn
         if hasattr(self.filter, 'advancedSearch') and  self.filter.advancedSearch != NotImplemented:
             adv = self.filter.advancedSearch
             if (isinstance(adv, KalturaMediaEntryMatchAttributeCondition)):
-                s = s + ("match: {} {}".format(adv.not_, adv.value))
+                s = s + ("tag: {}{}".format("!" if adv.not_ else "", adv.value))
         return s + ')'
 
 class FilterIter:
@@ -134,6 +167,6 @@ class FilterIter:
         except StopIteration as stp:
             self.pager.setPageIndex(self.pager.getPageIndex() + 1)
             self.objects = iter(getClient().media.list(self.filter.filter, self.pager).objects)
-            logging.debug("%s: iter page %d" % (self, self.pager.getPageIndex()))
+            logging.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
             return next(self.objects)
 
