@@ -60,7 +60,7 @@ def list(params):
             filter.undefined_LAST_PLAYED_AT();
     logging.info("list %s" % str(filter))
 
-    columns = ['id', 'views', 'lastPlayedDate', 'lastPlayedAt', 'categories', 'categoriesIds', 'tags']
+    columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags']
     print('\t'.join(columns))
     for entry in filter:
         print("\t".join([str(v) for v in kaltura.MediaEntry.values(entry, columns)]))
