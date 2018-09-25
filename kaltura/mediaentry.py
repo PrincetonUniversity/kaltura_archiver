@@ -8,9 +8,11 @@ class MediaEntry:
         return {  k : MediaEntry.getval(hsh, k) for k in keys }
 
     @staticmethod
-    def values(entry, keys=DEFAULT_KEYS):
-        hsh = vars(entry)
-        return  [MediaEntry.getval(hsh, k) for k in keys ]
+    def getval(entryhash, prop):
+        if (prop == 'lastPlayedDate'):
+            return MediaEntry.playedDate(entryhash['lastPlayedAt'])
+        else:
+            return entryhash[prop]
 
     @staticmethod
     def playedDate(at):
@@ -20,8 +22,10 @@ class MediaEntry:
             return None
 
     @staticmethod
-    def getval(entryhash, prop):
-        if (prop == 'lastPlayedDate'):
-            return MediaEntry.playedDate(entryhash['lastPlayedAt'])
-        else:
-            return entryhash[prop]
+    def values(entry, keys=DEFAULT_KEYS):
+        hsh = vars(entry)
+        return  [MediaEntry.getval(hsh, k) for k in keys ]
+
+    @staticmethod
+    def join(sep, entry, columns):
+        return (sep.join([str(v) for v in MediaEntry.values(entry, columns)]))

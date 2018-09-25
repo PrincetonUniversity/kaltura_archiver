@@ -44,11 +44,6 @@ It  uses the following environment variables
 
         return parser
 
-def connect(params):
-    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
-    logging.info(client)
-
-
 def list(params):
     """
     print matching kaltura records
@@ -70,8 +65,13 @@ def list(params):
     columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags']
     print('\t'.join(columns))
     for entry in filter:
-        print("\t".join([str(v) for v in kaltura.MediaEntry.values(entry, columns)]))
+        print kaltura.MediaEntry.join("\t", entry, columns)
+
     return None
+
+def connect(params):
+    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+    logging.info(client)
 
 def todo(params):
     logging.info("todo %s" % str(params))
