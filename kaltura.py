@@ -1,5 +1,7 @@
-
+#!/usr/bin/env python 
 import logging, traceback
+import os
+import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
 import sys
@@ -8,10 +10,12 @@ import kaltura
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
-                        'secret': 'KALTURA_SECRET|Kaltura Secret to access API|',
-                        'userId': 'KALTURA_USERID|Kaltura User Id|',
+                        'secret': 'KALTURA_SECRET|Kaltura secret to access API|',
+                        'userId': 'KALTURA_USERID|Kaltura user Id|',
                         'awsAccessKey': 'AWS_ACCESS_KEY_ID|AWS access Key Id|',
-                        'awsAccessSecret': 'AWS_SECRET_ACCESS_KEY|AWS secret access key|'}
+                        'awsAccessSecret': 'AWS_SECRET_ACCESS_KEY|AWS secret access key|',
+                        'awsBucket' : 'AWS_BUCKET|AWS s3 bucket for video storage|',
+                        'videoPlaceholder' : 'PLACEHOLDER_VIDEO|placeholder video|placeholder_video.mp4'}
 
     DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, archive and restore videos to and from AWS storage.
 
@@ -31,7 +35,7 @@ It  uses the following environment variables
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
-        subparsers.add_parser('connect', help='test access to Kaltura KMC and AWS').set_defaults(func=connect)
+        subparsers.add_parser('check_config', help='test access to Kaltura KMC, AWS ....').set_defaults(func=setup)
 
         subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
         subparser.add_argument("--category", "-c",  help="kaltura category")
@@ -53,7 +57,7 @@ def list(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    connect(params)
+    setup(params)
 
     filter = kaltura.api.Filter()
     filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
@@ -69,9 +73,27 @@ def list(params):
 
     return None
 
-def connect(params):
-    client = kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
-    logging.info(client)
+def setup(params):
+    # connect to Kaltura
+    kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+
+    # Check for existence of placeholder video
+    if not os.path.isfile(params['videoPlaceholder']):
+        raise(RuntimeError("Can not access placeholder file '{}'".format(params['videoPlaceholder'])))
+    else:
+        logging.info("setup: videoPlaceholder={}".format(params['videoPlaceholder']))
+
+    # chek on AWS bucket
+    bucket = params['awsBucket']
+    try:
+        s3resource = boto3.resource('s3')
+        s3resource.meta.client.head_bucket(Bucket=bucket)
+        logging.info("Using AWS bucket {}".format(bucket))
+    except Exception as e:
+        raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
+
+
+
 
 def todo(params):
     logging.info("todo %s" % str(params))
@@ -101,6 +123,6 @@ if __name__ == '__main__':
     except Exception as e:
         print("\n" + str(e) + "\n")
         parser.print_usage()
-        if (True or not isinstance(e, RuntimeError)):
+        if (not isinstance(e, RuntimeError)):
             traceback.print_exc()
         sys.exit(-1)
