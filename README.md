@@ -1,19 +1,21 @@
 Kaltura
 =======
 
-The script [kaltura.py](kaltura.py) uses an action parameter. It can simply try to connect to the kaltura server,
-list certain videos, backup/restore videos to AWS storage, 
-or replace backed up videos with a placeholder video in the kaltura server
+The script [kaltura_aws.py](kaltura_aws.py) is the main script to be run. 
 
-[kaltura.py](kaltura.py) relies on environment variables to authenticate against the Kaltura KMC  and AWS. 
+It lists, archives and restores videos in Kaltura.  
+It relies on environment variables to authenticate against the Kaltura KMC  and AWS. 
+Start with  the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) set the relevant environment variables. 
 
-Edit the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) set the relevant environment variables. 
-
-Use [kaltura.py](kaltura.py)'s help option for further documentation 
+Use the help option for further documentation 
 
 ~~~
-python kaltura.py --help 
+python kaltura_aws.py --help 
 ~~~
+
+## Workflow 
+
+see https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
 
 ## Installation
 
