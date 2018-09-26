@@ -8,6 +8,8 @@ import sys
 
 import kaltura
 
+FLAVORS_DELETED_TAG = "flavors_deleted"
+
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
                         'secret': 'KALTURA_SECRET|Kaltura secret to access API|',
@@ -42,6 +44,11 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=list)
 
+        subparser = subparsers.add_parser('del_flavors', help="delete derived flavors of matching videos in Kaltua KMC ")
+        subparser.add_argument("--delete", action="store_true", default=False, help="performs in dryrun mode, unless delete param is given")
+        KalturaArgParser._add_filter_parsm(subparser)
+        subparser.set_defaults(func=del_flavors)
+
         return parser
 
     @staticmethod
@@ -58,8 +65,6 @@ It  uses the following environment variables
 def list(params):
     """
     print matching kaltura records
-
-    run kaltura.py list --help to get a list of available searcj filter options
 
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
@@ -106,6 +111,24 @@ def list(params):
                 print(s)
     return None
 
+def del_flavors(params):
+    """
+    delete derived flavors from  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params)
+    filter = _create_filter(params)
+    doit = params['delete']
+    logging.info("del_flavors delete={} {}".format(doit, filter))
+
+    for entry in filter:
+        mentry = kaltura.MediaEntry(entry)
+        mentry.deleteDerivedFlavors(doDelete=doit)
+        mentry.addTag(FLAVORS_DELETED_TAG, doit)
+    return None
+
 
 def _create_filter(params):
     filter = kaltura.Filter()
@@ -124,8 +147,9 @@ def setup(params):
         raise(RuntimeError("Can not access placeholder file '{}'".format(params['videoPlaceholder'])))
     else:
         logging.info("setup: videoPlaceholder={}".format(params['videoPlaceholder']))
+    print(params)
 
-    # chek on AWS bucket
+    # check on AWS bucket
     bucket = params['awsBucket']
     try:
         s3resource = boto3.resource('s3')
