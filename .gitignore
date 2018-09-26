@@ -2,6 +2,7 @@
 nogit
 
 # python compiled 
+scratch.py 
 *.pyc
 
 # IDEs 
