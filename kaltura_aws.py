@@ -70,24 +70,37 @@ def list(params):
     logging.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
-        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags', 'name']
+        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
         print('\t'.join(columns))
         for entry in filter:
-            print kaltura.MediaEntry.join("\t", entry, columns)
+            kentry = kaltura.MediaEntry(entry)
+            s = ""
+            s += "{:>10}\t".format(kentry.getLastPlayedDate())
+            s += "{:>12}\t".format(entry.getLastPlayedAt())
+            s += "{}\t".format(entry.getViews())
+            s += "{:>12}\t".format(entry.getId())
+            s += "{:>10}\t".format(kentry.getTotalSize())
+            s += "{:.15}\t".format(entry.getCategories())
+            s += "{}\t".format(entry.getCategoriesIds())
+            s += "|\t"
+            s += "{}\t".format(entry.getTags())
+            s += "|\t"
+            s += "{}\t".format(entry.getName())
+            print s
     else:
         columns = ['id', 'flavor-id', 'original', 'size(KB)', 'createdAt', 'createdAtDate', 'deletedAt', 'deletedAtDate', 'status', 'status']
         print('\t'.join(columns))
         for entry in filter:
             for f in kaltura.FlavorAssetIterator(entry):
                 s = ""
-                s += "{}\t".format(entry.id)
+                s += "{}\t".format(entry.getId())
                 s += "{}\t".format(f.getId())
                 s += "{}\t".format(f.getIsOriginal())
-                s += "{}\t".format(f.getSize())
-                s += "{}\t".format(f.getCreatedAt())
-                s += "{}\t".format(kaltura.dateString(f.getCreatedAt()))
-                s += "{}\t".format(f.getDeletedAt())
-                s += "{}\t".format(kaltura.dateString(f.getDeletedAt()))
+                s += "{:>10}\t".format(f.getSize())
+                s += "{:>12}\t".format(f.getCreatedAt())
+                s += "{:>10}\t".format(kaltura.dateString(f.getCreatedAt()))
+                s += "{:>12}\t".format(f.getDeletedAt())
+                s += "{:>10}\t".format(kaltura.dateString(f.getDeletedAt()))
                 s += "{}\t".format(f.getStatus().value)
                 s += "{}\t".format(kaltura.FlavorAssetStatus.str(f.getStatus()))
                 print(s)
@@ -104,7 +117,7 @@ def _create_filter(params):
 
 def setup(params):
     # connect to Kaltura
-    kaltura.api.startsession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+    kaltura.api.startSession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
 
     # Check for existence of placeholder video
     if not os.path.isfile(params['videoPlaceholder']):

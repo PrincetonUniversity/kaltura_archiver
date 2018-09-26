@@ -1,42 +1,21 @@
-from datetime import datetime
 import api
 
+from KalturaClient.Plugins.Core import KalturaMediaEntry
+
 class MediaEntry:
-    DEFAULT_KEYS = ['id', 'views', 'lastPlayedAt','tags', 'categoriesIds', 'categories']
+    def __init__(self, entry):
+        self.entry = entry
 
-    @staticmethod
-    def getSourceFlavor(entry):
-        flavorassetswparamslist = api.getClient().flavorAsset.getFlavorAssetsWithParams(entry.id)
+    def getTotalSize(self):
+        size = 0
+        for f in FlavorAssetIterator(self.entry):
+            if (f.getSize()):
+                size += f.getSize()
+        return size
 
-        for flavorassetwparams in flavorassetswparamslist:
-            flavorasset = flavorassetwparams.getFlavorAsset()
+    def getLastPlayedDate(self):
+        return api.dateString(self.entry.getLastPlayedAt())
 
-            if ( flavorasset is not None and flavorasset.getIsOriginal()):
-                return flavorasset
-
-        # If the original wasn't found
-        return None
-
-    @staticmethod
-    def props(entry, keys=DEFAULT_KEYS):
-        hsh = vars(entry)
-        return {  k : MediaEntry.getval(hsh, k) for k in keys }
-
-    @staticmethod
-    def getval(entryhash, prop):
-        if (prop == 'lastPlayedDate'):
-            return api.dateString(entryhash['lastPlayedAt'])
-        else:
-            return entryhash[prop]
-
-    @staticmethod
-    def values(entry, keys=DEFAULT_KEYS):
-        hsh = vars(entry)
-        return  [MediaEntry.getval(hsh, k) for k in keys ]
-
-    @staticmethod
-    def join(sep, entry, columns):
-        return (sep.join([str(v) for v in MediaEntry.values(entry, columns)]))
 
 
 

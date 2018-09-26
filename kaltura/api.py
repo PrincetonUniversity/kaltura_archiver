@@ -12,7 +12,7 @@ def getClient():
     global __client__;
     return __client__;
 
-def startsession(partner_id, user_id, secret):
+def startSession(partner_id, user_id, secret):
     """ Use configuration to generate KS
     """
     global __client__
