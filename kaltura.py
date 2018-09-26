@@ -38,12 +38,9 @@ It  uses the following environment variables
         subparsers.add_parser('check_config', help='test access to Kaltura KMC, AWS ....').set_defaults(func=setup)
 
         subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
+        subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or falvor information")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=list)
-
-        subparser = subparsers.add_parser('flavors', help="list flavors of matching videos in Kaltua KMC ")
-        KalturaArgParser._add_filter_parsm(subparser)
-        subparser.set_defaults(func=flavors)
 
         return parser
 
@@ -69,38 +66,24 @@ def list(params):
     """
     setup(params)
     filter = _create_filter(params)
+    mode = params['mode']
+    logging.info("list {} {}".format(mode, filter))
 
-    logging.info("list %s" % str(filter))
-    columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags']
-    print('\t'.join(columns))
-    for entry in filter:
-        print kaltura.MediaEntry.join("\t", entry, columns)
-
-    return None
-
-def flavors(params):
-    """
-    print flavors of matching kaltura records
-
-    run kaltura.py list --help to get a list of available searcj filter options
-
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    setup(params)
-    filter = _create_filter(params)
-
-    logging.info("flavors {}".format(filter))
-    for entry in filter:
-        print(entry.id)
-        for flavor in kaltura.FlavorAssetIterator(entry):
-            print("\t".join([str(entry.id), str(flavor.getIsOriginal()), str(vars(flavor.status))]))
-
+    if (params['mode'] == 'video'):
+        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags']
+        print('\t'.join(columns))
+        for entry in filter:
+            print kaltura.MediaEntry.join("\t", entry, columns)
+    else:
+        for entry in filter:
+            print(entry.id)
+            for f in kaltura.FlavorAssetIterator(entry):
+                print("\t".join([str(entry.id), f.__class__str(f.id), str(f.getIsOriginal()),  str(vars(f))]))
     return None
 
 
 def _create_filter(params):
-    filter = kaltura.api.Filter()
+    filter = kaltura.Filter()
     filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
     filter.years_since_played(params['unplayed']).played_within_years(params['played'])
     if (params['noLastPlayed']) :
