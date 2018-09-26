@@ -1,5 +1,15 @@
+# Kaltura KMC keys
 setenv    KALTURA_USERID  email
 setenv    KALTURA_PARTNERID  ID
 setenv    KALTURA_SECRET  secret
 
+# AWS credentials
+setenv AWS_ACCESS_KEY_ID aws_id
+setenv AWS_SECRET_ACCESS_KEY aws_secret
+
+# bucket where medias is stored
+setenv AWS_BUCKET bucket_name
+
+# video to use for replacement
+setenv PLACEHOLDER_VIDEO placeholder_video.mp4
 

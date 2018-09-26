@@ -3,6 +3,12 @@ export KALTURA_PARTNERID=email
 export KALTURA_SECRET=secret
 export KALTURA_USERID=id
 
-# S3 bucket keys
+# AWS credentials
 export AWS_ACCESS_KEY_ID=aws_id
 export AWS_SECRET_ACCESS_KEY=aws_key
+
+# bucket where medis is stored
+export AWS_BUCKET=bucket_name
+
+# video to use for replacement
+export PLACEHOLDER_VIDEO=placeholder_video.mp4
