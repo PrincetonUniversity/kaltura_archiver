@@ -70,15 +70,27 @@ def list(params):
     logging.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
-        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags']
+        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'categories', 'categoriesIds', 'tags', 'name']
         print('\t'.join(columns))
         for entry in filter:
             print kaltura.MediaEntry.join("\t", entry, columns)
     else:
+        columns = ['id', 'flavor-id', 'original', 'size(KB)', 'createdAt', 'createdAtDate', 'deletedAt', 'deletedAtDate', 'status', 'status']
+        print('\t'.join(columns))
         for entry in filter:
-            print(entry.id)
             for f in kaltura.FlavorAssetIterator(entry):
-                print("\t".join([str(entry.id), f.__class__str(f.id), str(f.getIsOriginal()),  str(vars(f))]))
+                s = ""
+                s += "{}\t".format(entry.id)
+                s += "{}\t".format(f.getId())
+                s += "{}\t".format(f.getIsOriginal())
+                s += "{}\t".format(f.getSize())
+                s += "{}\t".format(f.getCreatedAt())
+                s += "{}\t".format(kaltura.dateString(f.getCreatedAt()))
+                s += "{}\t".format(f.getDeletedAt())
+                s += "{}\t".format(kaltura.dateString(f.getDeletedAt()))
+                s += "{}\t".format(f.getStatus().value)
+                s += "{}\t".format(kaltura.FlavorAssetStatus.str(f.getStatus()))
+                print(s)
     return None
 
 

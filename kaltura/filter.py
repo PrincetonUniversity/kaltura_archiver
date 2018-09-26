@@ -163,7 +163,7 @@ class Filter:
 
 
 class FilterIter:
-    PAGER_CHUNK = 10
+    PAGER_CHUNK = 200
 
     def __init__(self, filter):
         self.filter = filter

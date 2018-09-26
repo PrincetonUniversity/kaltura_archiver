@@ -4,7 +4,7 @@ import logging
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
 
-import mediaentry
+from datetime import datetime
 
 __client__ = None
 
@@ -29,4 +29,14 @@ def startsession(partner_id, user_id, secret):
     __client__ = client
     return None
 
+
+def dateString(at):
+    """
+    :param at: utc time
+    :return:   formatted date string
+    """
+    if (at != None):
+        return datetime.utcfromtimestamp(at).strftime('%Y-%m-%d')
+    else:
+        return None
 

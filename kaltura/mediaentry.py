@@ -1,12 +1,6 @@
 from datetime import datetime
 import api
 
-def playedDate(at):
-    if (at != None):
-        return datetime.utcfromtimestamp(at).strftime('%Y-%m-%d')
-    else:
-        return None
-
 class MediaEntry:
     DEFAULT_KEYS = ['id', 'views', 'lastPlayedAt','tags', 'categoriesIds', 'categories']
 
@@ -31,7 +25,7 @@ class MediaEntry:
     @staticmethod
     def getval(entryhash, prop):
         if (prop == 'lastPlayedDate'):
-            return playedDate(entryhash['lastPlayedAt'])
+            return api.dateString(entryhash['lastPlayedAt'])
         else:
             return entryhash[prop]
 
@@ -60,3 +54,24 @@ class FlavorAssetIterator:
             return nxt.getFlavorAsset();
         return self.next()
 
+
+class FlavorAssetStatus:
+    """
+    based on KalturaFlavorAssetStatus
+    """
+    _STRINGS = [
+    "ERROR",
+    "QUEUED", 
+    "CONVERTING", 
+    "READY", 
+    "DELETED", 
+    "NOT_APPLICABLE", 
+    "TEMP", 
+    "WAIT_FOR_CONVERT", 
+    "IMPORTING", 
+    "VALIDATING", 
+    "EXPORTING" 
+    ]
+    @staticmethod
+    def str(status):
+        return FlavorAssetStatus._STRINGS[status.value + 1]
