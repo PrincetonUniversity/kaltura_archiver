@@ -38,7 +38,7 @@ It  uses the following environment variables
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
-        subparsers.add_parser('check_config', help='test access to Kaltura KMC, AWS ....').set_defaults(func=setup)
+        subparsers.add_parser('config', help='test access to Kaltura KMC, AWS ....').set_defaults(func=setup)
 
         subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or falvor information")
@@ -133,7 +133,7 @@ def save_to_aws(params):
     for entry in filter:
         fname = kaltura.MediaEntry(entry).downloadOriginal(doit)
         if (fname):
-            logging.info("Entry {} Save to AWS {}". format(entry.getId(), fname))
+            aws.glacier_store(fname, params['awsBucket'], entry.getId(), doit)
         else:
             failed.append(entry)
     if (failed):
