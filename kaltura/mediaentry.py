@@ -48,9 +48,7 @@ class MediaEntry:
         if (original != None):
             logging.info("{} Skip   Flavor: {}".format(self._log(doDelete), Flavor(original)))
             for f in derived:
-                logging.info("{} Delete Flavor: {}".format(self._log(doDelete), Flavor(f)))
-                if (doDelete):
-                    api.getClient().flavorAsset.delete(f.getId())
+                Flavor(f).delete(doDelete)
             return True
         else:
             logging.error("{} Skip   Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), self.entry.getId()))
@@ -65,7 +63,7 @@ class MediaEntry:
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
-        logging.info("{} Tag    {} -> {}".format(self._log(doUpdate), self.entry.tags, mediaEntry.tags))
+        logging.info("{} Tag    '{}' -> '{}'".format(self._log(doUpdate), self.entry.tags, mediaEntry.tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
@@ -76,8 +74,16 @@ class MediaEntry:
 class Flavor:
     def __init__(self, flavor):
         if (not isinstance(flavor, KalturaFlavorAsset)):
-            raise RuntimeError("Can't create MediaEntry with {} instance".format(flavor))
+            raise RuntimeError("Can't create Flavor with {} instance".format(flavor))
         self.flavor = flavor
+
+    def delete(self, doDelete):
+        logging.info("{} Delete Flavor: {}".format(self._log(doDelete), self))
+        if (doDelete):
+            api.getClient().flavorAsset.delete(self.flavor.getId())
+
+    def _log(self, doIt):
+        return "Entry {}{} | ".format(self.flavor.getEntryId(), '' if doIt else ' DRYRUN')
 
     def __repr__(self):
         f = self.flavor
