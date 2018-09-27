@@ -7,6 +7,7 @@ import envvars
 import sys
 
 import kaltura
+import aws
 
 FLAVORS_DELETED_TAG = "flavors_deleted"
 
@@ -48,6 +49,11 @@ It  uses the following environment variables
         subparser.add_argument("--delete", action="store_true", default=False, help="performs in dryrun mode, unless delete param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
+
+        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltua KMC ")
+        subparser.add_argument("--save", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        KalturaArgParser._add_filter_parsm(subparser)
+        subparser.set_defaults(func=save_to_aws)
 
         return parser
 
@@ -111,6 +117,30 @@ def list(params):
                 print(s)
     return None
 
+def save_to_aws(params):
+    """
+    save original flavors to aws  for  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params)
+    filter = _create_filter(params)
+    doit = params['save']
+    logging.info("save_to_aws save={} {}".format(doit, filter))
+
+    failed = []
+    for entry in filter:
+        fname = kaltura.MediaEntry(entry).downloadOriginal(doit)
+        if (fname):
+            logging.info("Entry {} Save to AWS {}". format(entry.getId(), fname))
+        else:
+            failed.append(entry)
+    if (failed):
+        logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed)))
+    return None
+
+
 def del_flavors(params):
     """
     delete derived flavors from  matching kaltura records
@@ -163,11 +193,6 @@ def setup(params):
     except Exception as e:
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
 
-
-
-
-def todo(params):
-    logging.info("todo %s" % str(params))
 
 def _get_env_vars():
     env = envvars.to_value(KalturaArgParser.ENV_VARS)

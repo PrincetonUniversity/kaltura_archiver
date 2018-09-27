@@ -1,5 +1,8 @@
 import api
 import logging
+import tempfile
+import urllib
+
 from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset
 
 class MediaEntry:
@@ -27,6 +30,34 @@ class MediaEntry:
                 return f
         return None
 
+    def downloadOriginal(self, doit=False):
+        """
+        generate a temporary file name and download the original flavor file
+
+        if not doit - just log actions - but do not perform
+
+        :param doit:
+        :return: upon success return the tenp file name  - otherwise return None
+        """
+        original = self.getOriginalFlavor()
+        if (original):
+            to_file = tempfile.mkstemp()[1]
+            logging.info("{} Download Original Flavor {} to {}".format(self._log(doit), original.getId(), to_file))
+            download_url = api.getClient().flavorAsset.getUrl(original.getId())
+            if doit:
+                try:
+                    urllib.urlretrieve (download_url, to_file)
+                    return to_file
+                except Exception as e:
+                    logging.error("{} Download Original Entry: {} Flavor {}: {}".format(self._log(doit), self.entry.getId(), original.getId(), e))
+            else:
+                #dryRun always succeeds
+                return to_file
+        else:
+            logging.error("{} Skip Download Original Entry: {} has no ORIGINAL flavor".format(self._log(doit), self.entry.getId()))
+        return None
+
+
     def deleteDerivedFlavors(self, doDelete=False):
         """
         delete derived flavors  if doDelete
@@ -46,12 +77,12 @@ class MediaEntry:
                 derived.append(f)
 
         if (original != None):
-            logging.info("{} Skip   Flavor: {}".format(self._log(doDelete), Flavor(original)))
+            logging.info("{} Skip Delete Flavor: {}".format(self._log(doDelete), Flavor(original)))
             for f in derived:
                 Flavor(f).delete(doDelete)
             return True
         else:
-            logging.error("{} Skip   Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), self.entry.getId()))
+            logging.error("{} Skip Delete Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), self.entry.getId()))
         return False
 
     def addTag(self, newtag, doUpdate=False):
