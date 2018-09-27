@@ -18,28 +18,57 @@ class MediaEntry:
     def getLastPlayedDate(self):
         return api.dateString(self.entry.getLastPlayedAt())
 
-    def deleteDerivedFlavors(self, doDelete=False):
+    def getOriginalFlavor(self):
+        """
+        :return: original flavor or None
+        """
         for f in FlavorAssetIterator(self.entry):
             if (f.getIsOriginal()):
-                logging.info("{} Skip   Flavor: {}".format(self._log(doDelete), Flavor(f)))
+                return f
+        return None
+
+    def deleteDerivedFlavors(self, doDelete=False):
+        """
+        delete derived flavors  if doDelete
+        otherwise simply log actions but do not actually take them
+
+        skip deletion if entry has no original flavor
+
+        :param doDelete: actually delete flavors
+        :return: False if entry has no ORIGINAL flavor
+        """
+        derived = []
+        original = None
+        for f in FlavorAssetIterator(self.entry):
+            if (f.getIsOriginal()):
+                original = f
             else:
+                derived.append(f)
+
+        if (original != None):
+            logging.info("{} Skip   Flavor: {}".format(self._log(doDelete), Flavor(original)))
+            for f in derived:
                 logging.info("{} Delete Flavor: {}".format(self._log(doDelete), Flavor(f)))
                 if (doDelete):
                     api.getClient().flavorAsset.delete(f.getId())
-
+            return True
+        else:
+            logging.error("{} Skip   Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), self.entry.getId()))
+        return False
 
     def addTag(self, newtag, doUpdate=False):
         """
         add given tag to entry
         :param newtag: tag string
-        :param doUpdate: if False only fo through the motions
-        :return:
+        :param doUpdate: if False only go through the motions
+        :return: None
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
         logging.info("{} Tag    {} -> {}".format(self._log(doUpdate), self.entry.tags, mediaEntry.tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
+        return None
 
     def _log(self, doIt):
         return "Entry {}{} | ".format(self.entry.getId(), '' if doIt else ' DRYRUN')

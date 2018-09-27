@@ -123,10 +123,15 @@ def del_flavors(params):
     doit = params['delete']
     logging.info("del_flavors delete={} {}".format(doit, filter))
 
+    failed = []
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
-        mentry.deleteDerivedFlavors(doDelete=doit)
-        mentry.addTag(FLAVORS_DELETED_TAG, doit)
+        if (mentry.deleteDerivedFlavors(doDelete=doit)):
+            mentry.addTag(FLAVORS_DELETED_TAG, doit)
+        else:
+            failed.append(entry)
+    if (failed):
+        logging.error("FAILED to delete flavors from {}".format(",".join(e.getId() for e in failed)))
     return None
 
 
