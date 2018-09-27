@@ -13,9 +13,51 @@ Use the help option for further documentation
 python kaltura_aws.py --help 
 ~~~
 
-## Workflow 
+## Archiving Videos Workflow 
 
-see https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
+Only videos that have not been played recently are archived. 
+
+The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
+
+ 1. number of years since placed
+ 2. whether video has no lastPlayedAt property 
+ 3. category id 
+ 3. tag value 
+
+All actions, like downlading original flavors and storing in AWS, deleting derived flavors, deleting the original source video, 
+or restoring sources and recreating derivates are performed in dryRun mode by default, that is the script logs actions but does not actually perform them. 
+
+### Archiving Videos
+Apply the following steps with the same video selection criterium, eg apply to all videos without a lastPlayedAt property:
+
+ 1. Save to AWS-Glacier:
+    1. if video does not exist in AWS-Glacier: download and store original in AWS-Glacier and apply tag: "archived_to_s3" 
+    1. otherwise apply tag: "archived_to_s3" 
+ 1. Delete derived flavors and apply tag: 'deleted_flavors'     
+    1. ONLY IFF video has original flavor 
+    1. AND original flavor 'arrived' in AWS-Glacier 
+ 1. Delete original flavor and replace with placeholder video      
+    1. ONLY IFF: video has original flavor - REALLY ??
+    1. AND original flavor 'arrived' in AWS-Glacier 
+   
+
+### Restoring Videos
+
+Klatura updates the lastPlayedAt property of videos when they are played. 
+So when a placeholder video is played it receives the current date as is its lastPlayedAt property
+
+Apply the following steps to videos with the tag "archived_to_s3" that have been played within the last year
+
+ 1. Request restoral from AWS Glacier   IF not yet available in S3; This request will take 5 - 12 hours to complete.
+ 1. Restore Video:
+   1. replace placeholder video with original video  IF video is availabe in S3
+   1. recreate flavors and remove   tag: "flavors_deleted"
+   
+
+
+### See Early Requirements  
+https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
+
 
 ## Installation
 
