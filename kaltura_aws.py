@@ -133,7 +133,7 @@ def save_to_aws(params):
     for entry in filter:
         fname = kaltura.MediaEntry(entry).downloadOriginal(doit)
         if (fname):
-            aws.glacier_store(fname, params['awsBucket'], entry.getId(), doit)
+            aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
         else:
             failed.append(entry)
     if (failed):
