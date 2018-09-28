@@ -147,10 +147,11 @@ def list(params):
     setup(params)
     filter = _create_filter(params)
     mode = params['mode']
+    bucket = params['awsBucket']
     logging.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
-        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
+        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'isArchived', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
@@ -160,6 +161,7 @@ def list(params):
             s += "{}\t".format(entry.getViews())
             s += "{:>12}\t".format(entry.getId())
             s += "{:>10}\t".format(kentry.getTotalSize())
+            s += "{}\t".format(str(aws.s3_exists(entry.getId(), bucket)))
             s += "{:.15}\t".format(entry.getCategories())
             s += "{}\t".format(entry.getCategoriesIds())
             s += "|\t"
