@@ -77,12 +77,12 @@ class MediaEntry:
                 derived.append(f)
 
         if (original != None):
-            logging.info("{} Skip Delete Flavor: {}".format(self._log(doDelete), Flavor(original)))
+            logging.info("{}{:<12} Flavor: {}".format(self._log(doDelete), 'Skip Delete', Flavor(original)))
             for f in derived:
                 Flavor(f).delete(doDelete)
             return True
         else:
-            logging.error("{} Skip Delete Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), self.entry.getId()))
+            logging.error("{}{:<12} Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), 'Skip Delete', self.entry.getId()))
         return False
 
     def addTag(self, newtag, doUpdate=False):
@@ -94,7 +94,7 @@ class MediaEntry:
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
-        logging.info("{} Tag    '{}' -> '{}'".format(self._log(doUpdate), self.entry.tags, mediaEntry.tags))
+        logging.info("{}{:<12} '{}' -> '{}'".format(self._log(doUpdate), 'Add Tag', self.entry.tags, mediaEntry.tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
@@ -109,7 +109,7 @@ class Flavor:
         self.flavor = flavor
 
     def delete(self, doDelete):
-        logging.info("{} Delete Flavor: {}".format(self._log(doDelete), self))
+        logging.info("{}{:<12} Flavor: {}".format(self._log(doDelete), 'Delete', self))
         if (doDelete):
             api.getClient().flavorAsset.delete(self.flavor.getId())
 
