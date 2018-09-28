@@ -75,7 +75,7 @@ class Filter:
         self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
         self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
         self.filter.advancedSearch.value = Filter._years_ago(20)
-        logging.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(mediaentry.playedDate(self.filter.advancedSearch.value)) )
+        logging.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(api.dateString(self.filter.advancedSearch.value)) )
         return self
 
     def category(self, categoryId):
@@ -112,11 +112,12 @@ class Filter:
         """
         if years is not None:
             since = Filter._years_ago(years)
+            print(since.__class__)
             if (mode == 'lastPlayedAtLessThanOrEqual'):
                 self.filter.lastPlayedAtLessThanOrEqual = since
             elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
                 self.filter.lastPlayedAtGreaterThanOrEqual = since
-            logging.debug("Filter.{:s} {:%d %b %Y}".format(mode, since) )
+            logging.debug("Filter.{:s} {:s}".format(mode, api.dateString(since)) )
         else:
             logging.debug("Filter.{:s}: NOOP".format(mode))
         return self
@@ -140,10 +141,10 @@ class Filter:
             s = s + "idEqual=%s " % self.filter.idEqual
 
         if self.filter.lastPlayedAtGreaterThanOrEqual != NotImplemented:
-            s = s + "lastPlayed >= {} ".format(mediaentry.playedDate(self.filter.lastPlayedAtGreaterThanOrEqual))
+            s = s + "lastPlayed >= {} ".format(api.dateString(self.filter.lastPlayedAtGreaterThanOrEqual))
 
         if self.filter.lastPlayedAtLessThanOrEqual != NotImplemented:
-            s = s + "lastPlayed <= {} ".format(mediaentry.playedDate(self.filter.lastPlayedAtLessThanOrEqual))
+            s = s + "lastPlayed <= {} ".format(api.dateString(self.filter.lastPlayedAtLessThanOrEqual))
 
         if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
             s = s + "category={} ".format(self.filter.categoryAncestorIdIn)
@@ -153,7 +154,7 @@ class Filter:
             if isinstance(adv, KalturaMediaEntryMatchAttributeCondition) and adv.attribute == KalturaMediaEntryMatchAttribute.TAGS:
                     s = s + "tag: {}{}".format("!" if adv.not_ else "", adv.value)
             elif isinstance(adv,KalturaMediaEntryCompareAttributeCondition)  and adv.attribute == KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT:
-                    s = s + "undefPlayedAt-last >= {}".format(mediaentry.playedDate(adv.value))
+                    s = s + "undefPlayedAt-last >= {}".format(api.dateString(adv.value))
             else:
                     s = s + "bad advancedSearch"
         return s + ')'
