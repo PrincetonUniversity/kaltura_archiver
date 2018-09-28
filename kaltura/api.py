@@ -43,4 +43,4 @@ def dateString(at):
 
 def log_action(loglevel, doit, type, id, action, message):
     if logging.root.isEnabledFor(logging):
-        logging.root.log(loglevel, '{:<7} {:<10} {} | {:<20} {}'.format(type, id, '' if doit else 'DRYRUN', action, message))
+        logging.root.log(loglevel, ' {}{:<7} {:<10} | {:<20} {}'.format('' if doit else 'DRYRUN | ', type, id, action, message))

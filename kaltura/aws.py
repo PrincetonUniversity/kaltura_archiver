@@ -35,7 +35,7 @@ def s3_size(filename, bucketname):
 def s3_store(src_file, bucketname, bucketfile, doit=False):
     if (doit):
         _s3.meta.client.upload_file(src_file, bucketname, bucketfile)
-    api.log_action(logging.INFO, doit, "File", src_file, "Store", "to s3://{}/{}".format(bucketname, bucketfile))
+    api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Upload", "to {} from {}".format(bucketname,  src_file))
     return None
 
 def s3_restore(filename, bucketname, doit=False):

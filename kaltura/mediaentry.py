@@ -44,7 +44,7 @@ class MediaEntry:
         if (original):
             to_file = tempfile.mkstemp()[1]
             download_url = api.getClient().flavorAsset.getUrl(original.getId())
-            self.log_action(logging.INFO,doit, "Download", "Original {} to {}".format(original, to_file))
+            self.log_action(logging.INFO,doit, "Download", "Flavor({}) to {}".format(Flavor(original), to_file))
             if doit:
                 try:
                     urllib.urlretrieve(download_url, to_file)
