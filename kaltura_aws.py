@@ -7,9 +7,10 @@ import envvars
 import sys
 
 import kaltura
-import aws
+import kaltura.aws as aws
 
 FLAVORS_DELETED_TAG = "flavors_deleted"
+SAVED_TO_S3 = "archived_to_s3"
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
@@ -67,6 +68,62 @@ It  uses the following environment variables
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         return None
 
+def save_to_aws(params):
+    """
+    save original flavors to aws  for  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params)
+    filter = _create_filter(params)
+    doit = params['save']
+    logging.info("save_to_aws save={} {}".format(doit, filter))
+
+    failed_save = []
+    no_orig = []
+    for entry in filter:
+        mentry = kaltura.MediaEntry(entry)
+        original = mentry.getOriginalFlavor()
+        if (original):
+            fname = mentry.downloadOriginal(doit)
+            if (fname):
+                aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
+                kaltura.MediaEntry(entry).addTag(SAVED_TO_S3)
+            else:
+                failed_save.append(entry)
+        else:
+            no_orig.append(entry)
+
+    if (failed_save):
+        logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
+    if (no_orig):
+        logging.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
+    return None
+
+
+def del_flavors(params):
+    """
+    delete derived flavors from  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params)
+    filter = _create_filter(params)
+    doit = params['delete']
+    logging.info("del_flavors delete={} {}".format(doit, filter))
+
+    failed = []
+    for entry in filter:
+        mentry = kaltura.MediaEntry(entry)
+        if (mentry.deleteDerivedFlavors(doDelete=doit)):
+            mentry.addTag(FLAVORS_DELETED_TAG, doit)
+        else:
+            failed.append(entry)
+    if (failed):
+        logging.error("FAILED to delete flavors from {}".format(",".join(e.getId() for e in failed)))
+    return None
 
 def list(params):
     """
@@ -115,53 +172,6 @@ def list(params):
                 s += "{}\t".format(f.getStatus().value)
                 s += "{}\t".format(kaltura.FlavorAssetStatus.str(f.getStatus()))
                 print(s)
-    return None
-
-def save_to_aws(params):
-    """
-    save original flavors to aws  for  matching kaltura records
-
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    setup(params)
-    filter = _create_filter(params)
-    doit = params['save']
-    logging.info("save_to_aws save={} {}".format(doit, filter))
-
-    failed = []
-    for entry in filter:
-        fname = kaltura.MediaEntry(entry).downloadOriginal(doit)
-        if (fname):
-            aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
-        else:
-            failed.append(entry)
-    if (failed):
-        logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed)))
-    return None
-
-
-def del_flavors(params):
-    """
-    delete derived flavors from  matching kaltura records
-
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    setup(params)
-    filter = _create_filter(params)
-    doit = params['delete']
-    logging.info("del_flavors delete={} {}".format(doit, filter))
-
-    failed = []
-    for entry in filter:
-        mentry = kaltura.MediaEntry(entry)
-        if (mentry.deleteDerivedFlavors(doDelete=doit)):
-            mentry.addTag(FLAVORS_DELETED_TAG, doit)
-        else:
-            failed.append(entry)
-    if (failed):
-        logging.error("FAILED to delete flavors from {}".format(",".join(e.getId() for e in failed)))
     return None
 
 
