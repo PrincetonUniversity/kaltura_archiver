@@ -52,7 +52,7 @@ It  uses the following environment variables
         subparser.set_defaults(func=del_flavors)
 
         subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC ")
-        subparser.add_argument("--save", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=save_to_aws)
 
@@ -77,21 +77,33 @@ def save_to_aws(params):
     """
     setup(params)
     filter = _create_filter(params)
-    doit = params['save']
-    logging.info("save_to_aws save={} {}".format(doit, filter))
+    doit = params['archive']
+    bucket = params['awsBucket']
+    logging.info("save_to_aws archive={} {}".format(doit, filter))
 
     failed_save = []
     no_orig = []
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         original = mentry.getOriginalFlavor()
+        s3_file = entry.getId()
         if (original):
-            fname = mentry.downloadOriginal(doit)
-            if (fname):
-                aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
-                kaltura.MediaEntry(entry).addTag(SAVED_TO_S3)
+            if (aws.s3_exists(s3_file, bucket)):
+                s3_file_size = aws.s3_size(s3_file, bucket)
+                if (s3_file_size / 1024 == original.getSize()):
+                    mentry.log_action(logging.INFO, doit, 'Skip Archive',
+                                      'Bucket {} contains {} with same size={}'.format(bucket, s3_file, s3_file_size))
+                else:
+                    message = 'Bucket {} contains {} with size {}; Flavor has size {}'
+                    mentry.log_action(logging.ERROR, doit, 'Skip Archive',
+                                      message.format(bucket, s3_file, s3_file_size, original.getSize()))
             else:
-                failed_save.append(entry)
+                fname = mentry.downloadOriginal(doit)
+                if (fname):
+                    aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
+                    kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+                else:
+                    failed_save.append(entry)
         else:
             no_orig.append(entry)
 
