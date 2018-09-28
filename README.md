@@ -31,8 +31,8 @@ or restoring sources and recreating derivates are performed in dryRun mode by de
 Apply the following steps with the same video selection criterium, eg apply to all videos without a lastPlayedAt property:
 
  1. Save to AWS-Glacier:
-    1. if video does not exist in AWS-Glacier: download and store original in AWS-Glacier and apply tag: "archived_to_s3" 
-    1. otherwise apply tag: "archived_to_s3" 
+    1. if video does not exist in S3: download and store original 
+    1. apply tag: "archived_to_s3" 
  1. Delete derived flavors and apply tag: 'deleted_flavors'     
     1. ONLY IFF video has original flavor 
     1. AND original flavor 'arrived' in AWS-Glacier 
