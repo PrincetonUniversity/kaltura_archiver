@@ -45,12 +45,12 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=list)
 
-        subparser = subparsers.add_parser('del_flavors', help="delete derived flavors of matching videos in Kaltua KMC ")
+        subparser = subparsers.add_parser('del_flavors', help="delete derived flavors of matching videos in Kaltura KMC ")
         subparser.add_argument("--delete", action="store_true", default=False, help="performs in dryrun mode, unless delete param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
 
-        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltua KMC ")
+        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC ")
         subparser.add_argument("--save", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=save_to_aws)
