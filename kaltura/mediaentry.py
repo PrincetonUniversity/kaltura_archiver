@@ -5,6 +5,7 @@ import urllib
 
 from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset
 
+
 class MediaEntry:
     def __init__(self, entry):
         if (not isinstance(entry, KalturaMediaEntry)):
@@ -42,21 +43,20 @@ class MediaEntry:
         original = self.getOriginalFlavor()
         if (original):
             to_file = tempfile.mkstemp()[1]
-            logging.info("{} Download Original Flavor {} to {}".format(self._log(doit), original.getId(), to_file))
             download_url = api.getClient().flavorAsset.getUrl(original.getId())
+            self.log_action(logging.INFO,doit, "Download", "Original {} to {}".format(original, to_file))
             if doit:
                 try:
-                    urllib.urlretrieve (download_url, to_file)
+                    urllib.urlretrieve(download_url, to_file)
                     return to_file
                 except Exception as e:
-                    logging.error("{} Download Original Entry: {} Flavor {}: {}".format(self._log(doit), self.entry.getId(), original.getId(), e))
+                    self.log_action(logging.ERROR,doit, "Failed Download", "Original {} - {}".format(original, e))
             else:
-                #dryRun always succeeds
+                # dryRun always succeeds
                 return to_file
         else:
-            logging.error("{} Skip Download Original Entry: {} has no ORIGINAL flavor".format(self._log(doit), self.entry.getId()))
+            self.log_action(logging.ERROR,doit, "Can't Download", "Entry has no ORIGINAL Flavor")
         return None
-
 
     def deleteDerivedFlavors(self, doDelete=False):
         """
@@ -77,12 +77,11 @@ class MediaEntry:
                 derived.append(f)
 
         if (original != None):
-            logging.info("{}{:<12} Flavor: {}".format(self._log(doDelete), 'Skip Delete', Flavor(original)))
             for f in derived:
                 Flavor(f).delete(doDelete)
             return True
         else:
-            logging.error("{}{:<12} Entry: {} has no ORIGINAL flavor".format(self._log(doDelete), 'Skip Delete', self.entry.getId()))
+            self.log_action(logging.ERROR, doDelete, "Abort Delete", "Entry has no ORIGINAL Flavor")
         return False
 
     def addTag(self, newtag, doUpdate=False):
@@ -94,13 +93,14 @@ class MediaEntry:
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
-        logging.info("{}{:<12} '{}' -> '{}'".format(self._log(doUpdate), 'Add Tag', self.entry.tags, mediaEntry.tags))
+        self.log_action(logging.INFO, doUpdate, 'Add Tag', "'{}' -> '{}'".format(self.entry.tags, mediaEntry.tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
 
-    def _log(self, doIt):
-        return "Entry {}{} | ".format(self.entry.getId(), '' if doIt else ' DRYRUN')
+    def log_action(self, log_level, doIt, action, message):
+        api.log_action(log_level, doIt,'Entry', self.entry.getId(), action, message)
+
 
 class Flavor:
     def __init__(self, flavor):
@@ -109,16 +109,17 @@ class Flavor:
         self.flavor = flavor
 
     def delete(self, doDelete):
-        logging.info("{}{:<12} Flavor: {}".format(self._log(doDelete), 'Delete', self))
+        self.log_action(logging.INFO,doDelete, "Delete", "")
         if (doDelete):
             api.getClient().flavorAsset.delete(self.flavor.getId())
 
-    def _log(self, doIt):
-        return "Entry {}{} | ".format(self.flavor.getEntryId(), '' if doIt else ' DRYRUN')
+    def log_action(self, level, doIt, action, message):
+        return api.log_action(level, doIt, 'Entry', self.flavor.getEntryId(), action, "{} {}".format(Flavor(self.flavor), message))
 
     def __repr__(self):
         f = self.flavor
-        return "entryId:{}, id:{}, {}, size:{}".format(f.getEntryId(), f.getId(), ('ORIGINAL' if f.getIsOriginal() else 'derived'), f.getSize())
+        return "entryId:{}, id:{}, {}, size:{}".format(f.getEntryId(), f.getId(),
+                                                       ('ORIGINAL' if f.getIsOriginal() else 'derived'), f.getSize())
 
 
 class FlavorAssetIterator:
@@ -141,18 +142,19 @@ class FlavorAssetStatus:
     based on KalturaFlavorAssetStatus
     """
     _STRINGS = [
-    "ERROR",
-    "QUEUED", 
-    "CONVERTING", 
-    "READY", 
-    "DELETED", 
-    "NOT_APPLICABLE", 
-    "TEMP", 
-    "WAIT_FOR_CONVERT", 
-    "IMPORTING", 
-    "VALIDATING", 
-    "EXPORTING" 
+        "ERROR",
+        "QUEUED",
+        "CONVERTING",
+        "READY",
+        "DELETED",
+        "NOT_APPLICABLE",
+        "TEMP",
+        "WAIT_FOR_CONVERT",
+        "IMPORTING",
+        "VALIDATING",
+        "EXPORTING"
     ]
+
     @staticmethod
     def str(status):
         return FlavorAssetStatus._STRINGS[status.value + 1]
