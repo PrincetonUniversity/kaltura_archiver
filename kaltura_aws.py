@@ -12,6 +12,7 @@ import kaltura.aws as aws
 FLAVORS_DELETED_TAG = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
 
+
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
                         'secret': 'KALTURA_SECRET|Kaltura secret to access API|',
@@ -90,13 +91,16 @@ def save_to_aws(params):
         if (original):
             if (aws.s3_exists(s3_file, bucket)):
                 s3_file_size = aws.s3_size(s3_file, bucket)
-                if (s3_file_size / 1024 == original.getSize()):
-                    mentry.log_action(logging.INFO, doit, 'Skip Archive',
-                                      'Bucket {} contains {} with same size={}'.format(bucket, s3_file, s3_file_size))
+                s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
+                if (abs(s3_file_size_kb - original.getSize()) <= 1):
+                    log_level = logging.INFO
+                    action = "Archived"
                 else:
-                    message = 'Bucket {} contains {} with size {}; Flavor has size {}'
-                    mentry.log_action(logging.ERROR, doit, 'Skip Archive',
-                                      message.format(bucket, s3_file, s3_file_size, original.getSize()))
+                    log_level = logging.ERROR
+                    action = "Size Mismatch"
+                message = 's3://{}/{} has size {} = {}kb; Flavor {} has size {}kb'
+                mentry.log_action(log_level, doit, action,
+                                 message.format(bucket, s3_file, s3_file_size, s3_file_size_kb, original.getId(), original.getSize()))
             else:
                 fname = mentry.downloadOriginal(doit)
                 if (fname):
@@ -116,7 +120,9 @@ def save_to_aws(params):
 
 def del_flavors(params):
     """
-    delete derived flavors from  matching kaltura records
+    delete derived flavors from  matching kaltura records from matching entries
+
+    skip entries that are not marked with the tag
 
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
