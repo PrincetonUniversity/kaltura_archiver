@@ -30,7 +30,7 @@ def s3_size(filename, bucketname):
         return o.content_length
     except botocore.exceptions.ClientError as e:
         logging.debug("s3_object_size({}, {}): {}".format(bucketname, filename, e))
-        return 0
+        return -1
 
 def s3_store(src_file, bucketname, bucketfile, doit=False):
     if (doit):

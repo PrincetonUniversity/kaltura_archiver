@@ -1,15 +1,16 @@
 #!/usr/bin/env python 
 import logging, traceback
 import os
+import sys
 import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
-import sys
 
 import kaltura
 import kaltura.aws as aws
 
 FLAVORS_DELETED_TAG = "flavors_deleted"
+PLACE_HOLDER_VIDEO = "place_holder_video"
 SAVED_TO_S3 = "archived_to_s3"
 
 
@@ -52,6 +53,11 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
 
+        subparser = subparsers.add_parser('replace_video', help="replace matching entries that are archived with place holder video")
+        subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
+        KalturaArgParser._add_filter_parsm(subparser)
+        subparser.set_defaults(func=replace_videos)
+
         subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC and replace with placeholder video")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         KalturaArgParser._add_filter_parsm(subparser)
@@ -80,40 +86,110 @@ def save_to_aws(params):
     filter = _create_filter(params)
     doit = params['archive']
     bucket = params['awsBucket']
+    place_holder = params['videoPlaceholder']
     logging.info("save_to_aws archive={} {}".format(doit, filter))
 
     failed_save = []
     no_orig = []
+    failed_replace = []
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         original = mentry.getOriginalFlavor()
         s3_file = entry.getId()
-        if (original):
-            if (aws.s3_exists(s3_file, bucket)):
-                mentry.log_action(logging.ERROR, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
-            else:
-                fname = mentry.downloadOriginal(doit)
-                if (fname):
-                    aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
-                    kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
-                    if (not have_equal_sizes(original, s3_file, bucket, doit)):
-                        mentry.log_action(logging.ERROR, doit, "Size Mismatch",
-                                          's3://{}/{}: Flavor {} has size {}kb'.
-                                          format(bucket, s3_file, original.getId(), original.getSize()))
-                else:
-                    failed_save.append(entry)
-        else:
-            no_orig.append(entry)
 
+        if (not original):
+            no_orig.append(entry)
+            continue
+
+        if (aws.s3_exists(s3_file, bucket)):
+            mentry.log_action(logging.ERROR, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
+        else:
+            # download from kaltura
+            fname = mentry.downloadOriginal(doit)
+            if (not fname):
+                continue
+
+            # store to S3
+            aws.s3_store(fname, bucket, entry.getId(), doit)
+            kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+
+            # replace with place holder video
+            if (not replace_entry_video(mentry, place_holder, bucket, doit)):
+                failed_replace.append((entry))
+
+
+    if (failed_replace):
+        logging.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
     if (failed_save):
         logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
     if (no_orig):
         logging.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
     return None
 
-def have_equal_sizes(original, s3_file, bucket, doit):
-    if (not doit):
+def replace_videos(params):
+    """
+    replace original videos with place holder video for matching entries
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params)
+    filter = _create_filter(params)
+    doit = params['replace']
+    bucket = params['awsBucket']
+    place_holder = params['videoPlaceholder']
+    logging.info("replace_videos archive={} {}".format(doit, filter))
+
+    failed_replace = []
+
+    for entry in filter:
+        if (not replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)):
+                failed_replace.append(entry)
+
+    if (failed_replace):
+        logging.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
+    return None
+
+
+def replace_entry_video(mentry, place_holder, bucket, doit):
+    # bail if there is no original
+    original = mentry.getOriginalFlavor()
+    if (original == None):
+        mentry.log_action(logging.ERROR, doit, "Abort", 'Entry has no ORIGINAL')
+        return False
+
+    # bail if no have healthy s3 back up
+    s3_file = mentry.entry.getId()
+    if (not have_equal_sizes(original, s3_file, bucket, doit)):
+        mentry.log_action(logging.ERROR, doit, "Size Mismatch",
+                          's3://{}/{}: Flavor {} has size {}kb'.
+                         format(bucket, s3_file, original.getId(), original.getSize()))
+        return False
+
+    # delete derived flavors
+    if not del_entry_flavors(mentry, doit):
+        return False
+
+    # delete original flavor
+    kaltura.Flavor(original).delete(doit)
+
+    # replace with place_holder video
+    if (not mentry.replaceOriginal(place_holder, doit)):
+        return False
+
+    # indicate successful replace
+    mentry.addTag(PLACE_HOLDER_VIDEO, doit)
+    return True
+
+
+def del_entry_flavors(mentry, doit):
+    # delete entry flavors returns False when there is no original
+    if (mentry.deleteDerivedFlavors(doDelete=doit)):
+        mentry.addTag(FLAVORS_DELETED_TAG, doit)
         return True
+    else:
+        return False
+
+def have_equal_sizes(original, s3_file, bucket, doit):
     s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
     return abs(s3_file_size_kb - original.getSize()) <= 1
 
@@ -133,13 +209,10 @@ def del_flavors(params):
 
     failed = []
     for entry in filter:
-        mentry = kaltura.MediaEntry(entry)
-        if (mentry.deleteDerivedFlavors(doDelete=doit)):
-            mentry.addTag(FLAVORS_DELETED_TAG, doit)
-        else:
+        if (not del_entry_flavors(kaltura.MediaEntry(entry))):
             failed.append(entry)
     if (failed):
-        logging.error("FAILED to delete flavors from {}".format(",".join(e.getId() for e in failed)))
+        logging.error("FAILED to delete derived flavors from {}".format(",".join(e.getId() for e in failed)))
     return None
 
 def list(params):

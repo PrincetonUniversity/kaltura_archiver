@@ -3,7 +3,7 @@ import logging
 import tempfile
 import urllib
 
-from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset
+from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource
 
 
 class MediaEntry:
@@ -37,7 +37,7 @@ class MediaEntry:
 
         if not doit - just log actions - but do not perform
 
-        :param doit:
+        :param if False only log action take
         :return: upon success return the tenp file name  - otherwise return None
         """
         original = self.getOriginalFlavor()
@@ -65,7 +65,7 @@ class MediaEntry:
 
         skip deletion if entry has no original flavor
 
-        :param doDelete: actually delete flavors
+        :param doDelete: if False only log action take
         :return: False if entry has no ORIGINAL flavor
         """
         derived = []
@@ -84,11 +84,36 @@ class MediaEntry:
             self.log_action(logging.ERROR, doDelete, "Abort Delete", "Entry has no ORIGINAL Flavor")
         return False
 
+    def replaceOriginal(self, filepath, doReplace):
+        """
+        if doReplace then replace original video with contents of given filepath
+
+        :param filepath:  name of file that contains a video
+        :param doReplace: if False only log action take
+        :return:
+        """
+        self.log_action(logging.INFO, doReplace, 'Replace original', "with '{}'".format(filepath))
+        try:
+            if (doReplace):
+                uploadToken = KalturaUploadToken()
+                client = api.getClient()
+                uploadToken = client.uploadToken.add(uploadToken)
+                ulfile = file(filepath)
+                client.uploadToken.upload(uploadToken.id, ulfile)
+                uploadedFileTokenResource = KalturaUploadedFileTokenResource()
+                uploadedFileTokenResource.token = uploadToken.id
+                client.media.addContent(self.entry.getId(), uploadedFileTokenResource)
+                client.media.updateThumbnail(self.entry.getId(), 1)
+            return True
+        except Exception as e:
+            self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
+            return False
+
     def addTag(self, newtag, doUpdate=False):
         """
         add given tag to entry
         :param newtag: tag string
-        :param doUpdate: if False only go through the motions
+        :param doUpdate: if False only log action take
         :return: None
         """
         mediaEntry = KalturaMediaEntry()
