@@ -90,17 +90,7 @@ def save_to_aws(params):
         s3_file = entry.getId()
         if (original):
             if (aws.s3_exists(s3_file, bucket)):
-                s3_file_size = aws.s3_size(s3_file, bucket)
-                s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
-                if (abs(s3_file_size_kb - original.getSize()) <= 1):
-                    log_level = logging.INFO
-                    action = "Archived"
-                else:
-                    log_level = logging.ERROR
-                    action = "Size Mismatch"
-                message = 's3://{}/{} has size {} = {}kb; Flavor {} has size {}kb'
-                mentry.log_action(log_level, doit, action,
-                                 message.format(bucket, s3_file, s3_file_size, s3_file_size_kb, original.getId(), original.getSize()))
+                have_equal_sizes(mentry, original, s3_file, bucket, doit)
             else:
                 fname = mentry.downloadOriginal(doit)
                 if (fname):
@@ -117,6 +107,19 @@ def save_to_aws(params):
         logging.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
     return None
 
+def have_equal_sizes(mentry, original, s3_file, bucket, doit):
+    s3_file_size = aws.s3_size(s3_file, bucket)
+    s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
+    if (abs(s3_file_size_kb - original.getSize()) <= 1):
+        log_level = logging.INFO
+        action = "Archived"
+    else:
+        log_level = logging.ERROR
+        action = "Size Mismatch"
+    message = 's3://{}/{} has size {} = {}kb; Flavor {} has size {}kb'
+    mentry.log_action(log_level, doit, action,
+                      message.format(bucket, s3_file, s3_file_size, s3_file_size_kb, original.getId(), original.getSize()))
+    return logging.INFO == log_level    # aka sizes are the same
 
 def del_flavors(params):
     """
