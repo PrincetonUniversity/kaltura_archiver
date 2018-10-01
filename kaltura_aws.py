@@ -52,7 +52,7 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
 
-        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC ")
+        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC and replace with placeholder video")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=save_to_aws)
@@ -90,12 +90,16 @@ def save_to_aws(params):
         s3_file = entry.getId()
         if (original):
             if (aws.s3_exists(s3_file, bucket)):
-                have_equal_sizes(mentry, original, s3_file, bucket, doit)
+                mentry.log_action(logging.ERROR, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
             else:
                 fname = mentry.downloadOriginal(doit)
                 if (fname):
                     aws.s3_store(fname, params['awsBucket'], entry.getId(), doit)
                     kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+                    if (not have_equal_sizes(original, s3_file, bucket, doit)):
+                        mentry.log_action(logging.ERROR, doit, "Size Mismatch",
+                                          's3://{}/{}: Flavor {} has size {}kb'.
+                                          format(bucket, s3_file, original.getId(), original.getSize()))
                 else:
                     failed_save.append(entry)
         else:
@@ -107,19 +111,11 @@ def save_to_aws(params):
         logging.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
     return None
 
-def have_equal_sizes(mentry, original, s3_file, bucket, doit):
-    s3_file_size = aws.s3_size(s3_file, bucket)
+def have_equal_sizes(original, s3_file, bucket, doit):
+    if (not doit):
+        return True
     s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
-    if (abs(s3_file_size_kb - original.getSize()) <= 1):
-        log_level = logging.INFO
-        action = "Archived"
-    else:
-        log_level = logging.ERROR
-        action = "Size Mismatch"
-    message = 's3://{}/{} has size {} = {}kb; Flavor {} has size {}kb'
-    mentry.log_action(log_level, doit, action,
-                      message.format(bucket, s3_file, s3_file_size, s3_file_size_kb, original.getId(), original.getSize()))
-    return logging.INFO == log_level    # aka sizes are the same
+    return abs(s3_file_size_kb - original.getSize()) <= 1
 
 def del_flavors(params):
     """
