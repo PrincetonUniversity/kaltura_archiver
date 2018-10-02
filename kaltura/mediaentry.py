@@ -3,7 +3,7 @@ import logging
 import tempfile
 import urllib
 
-from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource
+from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource, KalturaFlavorAssetStatus
 
 
 class MediaEntry:
@@ -133,8 +133,11 @@ class Flavor:
             raise RuntimeError("Can't create Flavor with {} instance".format(flavor))
         self.flavor = flavor
 
+    def isReady(self):
+        return self.flavor.getStatus().value == KalturaFlavorAssetStatus.READY
+
     def delete(self, doDelete):
-        self.log_action(logging.INFO,doDelete, "Delete", "")
+        self.log_action(logging.INFO, doDelete, "Delete", "")
         if (doDelete):
             api.getClient().flavorAsset.delete(self.flavor.getId())
 

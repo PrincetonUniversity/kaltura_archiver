@@ -30,19 +30,30 @@ or restoring sources and recreating derivates are performed in dryRun mode by de
 ### Archiving Videos
 Apply the following steps with the same video selection criterium, eg apply to all videos without a lastPlayedAt property:
 
- 1. Save to S3:
-    1. if video does not exist in S3: download and store original 
-    1. apply tag: "archived_to_s3" 
- 1. Replace with Place Holder video 
-    1. delete derived flavors  apply 'flavors_deleted' tag
-        1. ONLY IFF video has original flavor 
-        1. AND original flavor 'arrived' in AWS-S3 and has same size as original flavor 
-        1. otherwise stop processing 
-    1. delete original; 
-    1. upload place holder video; create new thumbnail; 
-    1. if successfull apply 'place_holder_video' tag 
+Save to S3 pseudo code
+~~~
+if entry.original_flavor != None 
+and if entry.original_flavor.status == READY 
+and AWS bucket does not contain a file with the entries id 
+   transfer to AWS-s3 bucket 
+   apply 'archived_to_s3'  tag to entry
+~~~
 
 
+Replace with Place Holder video pseudo code
+~~~
+if entry.original_flavor != None 
+and if entry.original_flavor.status == READY 
+and AWS bucket contains a file with the entries id 
+and that file has the same size as the original flavor
+    delete derived flavors 
+    apply tag 'flavors_deleted' 
+    delete original 
+    upload place holder video; create new thumbnail;
+    if successfull apply 'place_holder_video' tag 
+~~~
+
+Run on command line:
 ~~~
 kaltura_aws.py  archive  [filter-options]
 kaltura_aws.py  replace_video [filter-options]

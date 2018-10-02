@@ -91,19 +91,27 @@ def archive_to_s3(params):
 
     failed_save = []
     no_orig = []
-    failed_replace = []
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         original = mentry.getOriginalFlavor()
         s3_file = entry.getId()
 
-        if (not original):
-            no_orig.append(entry)
-            continue
-
         if (aws.s3_exists(s3_file, bucket)):
             mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
-        else:
+
+        if (not original):
+            mentry.log_action(logging.ERROR, doit, "Abort", 'Entry has no Original')
+            no_orig.append(entry)
+            continue
+        mentry.log_action(logging.DEBUG, doit, "Check", 'Entry has Original')
+
+        status =  kaltura.FlavorAssetStatus.str(original.getStatus())
+        if not kaltura.Flavor(original).isReady():
+            mentry.log_action(logging.ERROR, doit, "Abort", 'Original Flavor {}: status == {}; need READY'.format(original.getId(),status))
+            continue
+        mentry.log_action(logging.DEBUG, doit, "Check", 'Original Flavor {}: status == {}; need READY'.format(original.getId(),status))
+
+        if (not aws.s3_exists(s3_file, bucket)):
             # download from kaltura
             fname = mentry.downloadOriginal(doit)
             if (not fname):
@@ -154,8 +162,8 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
     # bail if no have healthy s3 back up
     s3_file = mentry.entry.getId()
     if (not have_equal_sizes(original, s3_file, bucket, doit)):
-        mentry.log_action(logging.ERROR, doit, "Size Mismatch",
-                          's3://{}/{}: Flavor {} has size {}kb'.
+        mentry.log_action(logging.ERROR, doit, "Abort",
+                          'Size Mismatch - s3://{}/{}: Flavor {} has size {}kb'.
                          format(bucket, s3_file, original.getId(), original.getSize()))
         return False
     mentry.log_action(logging.DEBUG, doit, "Size Match",
