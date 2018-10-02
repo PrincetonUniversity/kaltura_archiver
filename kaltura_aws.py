@@ -53,15 +53,16 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
 
-        subparser = subparsers.add_parser('replace_video', help="replace matching entries that are archived with place holder video")
+        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC")
+        subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        KalturaArgParser._add_filter_parsm(subparser)
+        subparser.set_defaults(func=archive_to_s3)
+
+        subparser = subparsers.add_parser('replace_video', help="delete flavors and replace original with place holder video of matching entries  \
+        if they entries have healthy archivecopy in s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=replace_videos)
-
-        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC and replace with placeholder video")
-        subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
-        KalturaArgParser._add_filter_parsm(subparser)
-        subparser.set_defaults(func=save_to_aws)
 
         return parser
 
@@ -75,7 +76,7 @@ It  uses the following environment variables
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         return None
 
-def save_to_aws(params):
+def archive_to_s3(params):
     """
     save original flavors to aws  for  matching kaltura records
 
@@ -86,7 +87,6 @@ def save_to_aws(params):
     filter = _create_filter(params)
     doit = params['archive']
     bucket = params['awsBucket']
-    place_holder = params['videoPlaceholder']
     logging.info("save_to_aws archive={} {}".format(doit, filter))
 
     failed_save = []
@@ -113,13 +113,6 @@ def save_to_aws(params):
             aws.s3_store(fname, bucket, entry.getId(), doit)
             kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
 
-            # replace with place holder video
-            if (not replace_entry_video(mentry, place_holder, bucket, doit)):
-                failed_replace.append((entry))
-
-
-    if (failed_replace):
-        logging.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
     if (failed_save):
         logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
     if (no_orig):
