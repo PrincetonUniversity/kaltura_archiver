@@ -30,15 +30,23 @@ or restoring sources and recreating derivates are performed in dryRun mode by de
 ### Archiving Videos
 Apply the following steps with the same video selection criterium, eg apply to all videos without a lastPlayedAt property:
 
- 1. Save to AWS-Glacier:
+ 1. Save to S3:
     1. if video does not exist in S3: download and store original 
     1. apply tag: "archived_to_s3" 
- 1. Delete derived flavors and apply tag: 'deleted_flavors'     
-    1. ONLY IFF video has original flavor 
-    1. AND original flavor 'arrived' in AWS-Glacier 
- 1. Delete original flavor and replace with placeholder video      
-    1. ONLY IFF: video has original flavor - REALLY ??
-    1. AND original flavor 'arrived' in AWS-Glacier 
+ 1. Replace with Place Holder video 
+    1. delete derived flavors  apply 'flavors_deleted' tag
+        1. ONLY IFF video has original flavor 
+        1. AND original flavor 'arrived' in AWS-S3 and has same size as original flavor 
+        1. otherwise stop processing 
+    1. delete original; 
+    1. upload place holder video; create new thumbnail; 
+    1. if successfull apply 'place_holder_video' tag 
+
+
+~~~
+kaltura_aws.py  archive  [filter-options]
+kaltura_aws.py  replace_video [filter-options]
+~~~
    
 
 ### Restoring Videos
