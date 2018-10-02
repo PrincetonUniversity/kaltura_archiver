@@ -41,25 +41,25 @@ It  uses the following environment variables
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
-        subparsers.add_parser('config', help='test access to Kaltura KMC, AWS ....').set_defaults(func=setup)
+        subparsers.add_parser('config', description='test access to Kaltura KMC, AWS').set_defaults(func=setup)
 
-        subparser = subparsers.add_parser('list', help="list matching videos in Kaltua KMC ")
-        subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or falvor information")
+        subparser = subparsers.add_parser('list', description="list matching videos ")
+        subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=list)
 
-        subparser = subparsers.add_parser('del_flavors', help="delete derived flavors of matching videos in Kaltura KMC ")
+        subparser = subparsers.add_parser('del_flavors', description="delete derived flavors of matching videos at Kaltura KMC ")
         subparser.add_argument("--delete", action="store_true", default=False, help="performs in dryrun mode, unless delete param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=del_flavors)
 
-        subparser = subparsers.add_parser('archive', help="archive original flavors of matching videos in Kaltura KMC")
+        subparser = subparsers.add_parser('archive', description="archive original flavors of matching videos to AWS-s3")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=archive_to_s3)
 
-        subparser = subparsers.add_parser('replace_video', help="delete flavors and replace original with place holder video of matching entries  \
-        if they entries have healthy archivecopy in s3")
+        subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
+        IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=replace_videos)
@@ -202,7 +202,7 @@ def del_flavors(params):
 
     failed = []
     for entry in filter:
-        if (not del_entry_flavors(kaltura.MediaEntry(entry))):
+        if (not del_entry_flavors(kaltura.MediaEntry(entry), doit)):
             failed.append(entry)
     if (failed):
         logging.error("FAILED to delete derived flavors from {}".format(",".join(e.getId() for e in failed)))
