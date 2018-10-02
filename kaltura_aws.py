@@ -87,7 +87,7 @@ def archive_to_s3(params):
     filter = _create_filter(params)
     doit = params['archive']
     bucket = params['awsBucket']
-    logging.info("save_to_aws archive={} {}".format(doit, filter))
+    kaltura.logger.info("save_to_aws archive={} {}".format(doit, filter))
 
     failed_save = []
     no_orig = []
@@ -102,7 +102,7 @@ def archive_to_s3(params):
             continue
 
         if (aws.s3_exists(s3_file, bucket)):
-            mentry.log_action(logging.ERROR, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
+            mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
         else:
             # download from kaltura
             fname = mentry.downloadOriginal(doit)
@@ -114,9 +114,9 @@ def archive_to_s3(params):
             kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
 
     if (failed_save):
-        logging.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
+        kaltura.logger.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
     if (no_orig):
-        logging.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
+        kaltura.logger.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
     return None
 
 def replace_videos(params):
@@ -130,7 +130,7 @@ def replace_videos(params):
     doit = params['replace']
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
-    logging.info("replace_videos archive={} {}".format(doit, filter))
+    kaltura.logger.info("replace_videos archive={} {}".format(doit, filter))
 
     failed_replace = []
 
@@ -139,7 +139,7 @@ def replace_videos(params):
                 failed_replace.append(entry)
 
     if (failed_replace):
-        logging.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
+        kaltura.logger.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
     return None
 
 
@@ -149,6 +149,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
     if (original == None):
         mentry.log_action(logging.ERROR, doit, "Abort", 'Entry has no ORIGINAL')
         return False
+    mentry.log_action(logging.DEBUG, doit, "Check", 'Entry has ORIGINAL')
 
     # bail if no have healthy s3 back up
     s3_file = mentry.entry.getId()
@@ -157,6 +158,9 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                           's3://{}/{}: Flavor {} has size {}kb'.
                          format(bucket, s3_file, original.getId(), original.getSize()))
         return False
+    mentry.log_action(logging.DEBUG, doit, "Size Match",
+                  's3://{}/{}: Flavor {} has size {}kb'.
+                  format(bucket, s3_file, original.getId(), original.getSize()))
 
     # delete derived flavors
     if not del_entry_flavors(mentry, doit):
@@ -198,14 +202,14 @@ def del_flavors(params):
     setup(params)
     filter = _create_filter(params)
     doit = params['delete']
-    logging.info("del_flavors delete={} {}".format(doit, filter))
+    kaltura.logger.info("del_flavors delete={} {}".format(doit, filter))
 
     failed = []
     for entry in filter:
         if (not del_entry_flavors(kaltura.MediaEntry(entry), doit)):
             failed.append(entry)
     if (failed):
-        logging.error("FAILED to delete derived flavors from {}".format(",".join(e.getId() for e in failed)))
+        kaltura.logger.error("FAILED to delete derived flavors from {}".format(",".join(e.getId() for e in failed)))
     return None
 
 def list(params):
@@ -219,7 +223,7 @@ def list(params):
     filter = _create_filter(params)
     mode = params['mode']
     bucket = params['awsBucket']
-    logging.info("list {} {}".format(mode, filter))
+    kaltura.logger.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
         columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'isArchived', 'hasOriginal', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
@@ -277,15 +281,14 @@ def setup(params):
     if not os.path.isfile(params['videoPlaceholder']):
         raise(RuntimeError("Can not access placeholder file '{}'".format(params['videoPlaceholder'])))
     else:
-        logging.info("setup: videoPlaceholder={}".format(params['videoPlaceholder']))
-    print(params)
+        kaltura.logger.info("setup: videoPlaceholder={}".format(params['videoPlaceholder']))
 
     # check on AWS bucket
     bucket = params['awsBucket']
     try:
         s3resource = boto3.resource('s3')
         s3resource.meta.client.head_bucket(Bucket=bucket)
-        logging.info("Using AWS bucket {}".format(bucket))
+        kaltura.logger.info("Using AWS bucket {}".format(bucket))
     except Exception as e:
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
 
@@ -293,17 +296,21 @@ def setup(params):
 def _get_env_vars():
     env = envvars.to_value(KalturaArgParser.ENV_VARS)
     for v in env:
-        logging.info("%s=%s" % (v, '***' if "SECRET" in v.upper() else env[v]))
+        kaltura.logger.info("%s=%s" % (v, '***' if "SECRET" in v.upper() else env[v]))
     return env
 
 
 def _main(args):
+    handler = logging.FileHandler('kaltura.log')
+    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
+    handler.setFormatter(formatter)
+    kaltura.logger.addHandler(handler)
+
     if 'loglevel' in args:
-        logging.getLogger().setLevel(args['loglevel'])
-    logging.info(args)
+        kaltura.logger.setLevel(args['loglevel'])
+    kaltura.logger.info("---- {}".format(args))
     params = _get_env_vars()
     params.update(args)
-    #print(params)
     params['func'](params)
 
 if __name__ == '__main__':

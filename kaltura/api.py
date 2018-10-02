@@ -1,6 +1,9 @@
 
 import logging
 
+logger = logging.getLogger('kaltura')
+logger.addHandler(logging.NullHandler())
+
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
 
@@ -42,5 +45,5 @@ def dateString(at):
 
 
 def log_action(loglevel, doit, type, id, action, message):
-    if logging.root.isEnabledFor(logging):
-        logging.root.log(loglevel, ' {}{:<7} {:<10} | {:<20} {}'.format('' if doit else 'DRYRUN | ', type, id, action, message))
+    if logger.isEnabledFor(logging):
+        logger.log(loglevel, ' {}{:<7} {:<10} | {:<20} {}'.format('' if doit else 'DRYRUN | ', type, id, action, message))
