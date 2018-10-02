@@ -234,7 +234,7 @@ def list(params):
     kaltura.logger.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
-        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'isArchived', 'hasOriginal', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
+        columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'isArchived', 'hasOriginal', 'originalStatus', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
@@ -245,7 +245,9 @@ def list(params):
             s += "{:>12}\t".format(entry.getId())
             s += "{:>10}\t".format(kentry.getTotalSize())
             s += "{}\t".format(str(aws.s3_exists(entry.getId(), bucket)))
-            s += "{}\t".format(str(kentry.getOriginalFlavor() != None))
+            original = kentry.getOriginalFlavor()
+            s += "{}\t".format(str(original != None))
+            s += "{}\t".format(str(kaltura.FlavorAssetStatus.str(original.getStatus()) if original != None else 'None'))
             s += "{:.15}\t".format(entry.getCategories())
             s += "{}\t".format(entry.getCategoriesIds())
             s += "|\t"
