@@ -161,25 +161,12 @@ def replace_videos(params):
     filter = _create_filter(params)
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
-    wait = params['wait']
 
     nerror = 0
-    check_ready = []
     for entry in filter:
         if (not replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)):
             nerror += 1
-        else:
-            check_ready.append(entry)
 
-    if (check_ready):
-        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Wait',  '{} sec'.format(wait))
-        if (doit):
-            time.sleep(wait)
-        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Check',  'Check that uploaded videos have status READY')
-
-    for entry in check_ready:
-        if (not check_entry_ready(kaltura.MediaEntry(entry))):
-             nerror += 1
     return nerror
 
 def replace_entry_video(mentry, place_holder, bucket, doit):
@@ -252,7 +239,7 @@ def list(params):
             s += "{}\t".format(entry.getTags())
             s += "|\t"
             s += "{}\t".format(entry.getName())
-            print s
+            print(s)
     else:
         columns = ['id', 'flavor-id', 'original', 'size(KB)', 'createdAt', 'createdAtDate', 'deletedAt', 'deletedAtDate', 'status', 'status']
         print('\t'.join(columns))
