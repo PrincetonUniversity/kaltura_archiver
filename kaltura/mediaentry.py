@@ -58,7 +58,7 @@ class MediaEntry:
             self.log_action(logging.ERROR,doit, "Can't Download", "Entry has no ORIGINAL Flavor")
         return None
 
-    def deleteDerivedFlavors(self, doDelete=False):
+    def deleteFlavors(self, doDelete=False):
         """
         delete derived flavors  if doDelete
         otherwise simply log actions but do not actually take them
@@ -68,21 +68,10 @@ class MediaEntry:
         :param doDelete: if False only log action take
         :return: False if entry has no ORIGINAL flavor
         """
-        derived = []
-        original = None
         for f in FlavorAssetIterator(self.entry):
-            if (f.getIsOriginal()):
-                original = f
-            else:
-                derived.append(f)
-
-        if (original != None):
-            for f in derived:
-                Flavor(f).delete(doDelete)
-            return True
-        else:
-            self.log_action(logging.ERROR, doDelete, "Abort Delete", "Entry has no ORIGINAL Flavor")
-        return False
+                if (not Flavor(f).delete(doDelete)):
+                    return False
+        return True
 
     def replaceOriginal(self, filepath, doReplace):
         """
@@ -118,7 +107,7 @@ class MediaEntry:
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
-        self.log_action(logging.INFO, doUpdate, 'Add Tag', "'{}' -> '{}'".format(self.entry.tags, mediaEntry.tags))
+        self.log_action(logging.INFO, doUpdate, 'Add Tag', "'{}' tags -> '{}'".format(newtag, mediaEntry.tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
@@ -140,14 +129,15 @@ class Flavor:
         self.log_action(logging.INFO, doDelete, "Delete", "")
         if (doDelete):
             api.getClient().flavorAsset.delete(self.flavor.getId())
+        return True
 
     def log_action(self, level, doIt, action, message):
         return api.log_action(level, doIt, 'Entry', self.flavor.getEntryId(), action, "{} {}".format(Flavor(self.flavor), message))
 
     def __repr__(self):
         f = self.flavor
-        return "entryId:{}, id:{}, {}, size:{}".format(f.getEntryId(), f.getId(),
-                                                       ('ORIGINAL' if f.getIsOriginal() else 'derived'), f.getSize())
+        return "Flavor({}, entryId:{}, id:{}, size:{})".format(('Original' if f.getIsOriginal() else 'Derived '),
+                                                              f.getEntryId(), f.getId(), f.getSize())
 
 
 class FlavorAssetIterator:

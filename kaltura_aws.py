@@ -175,11 +175,8 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
         if (checker.hasOriginal()):
             if (checker.aws_S3_file(bucket)):
                 # delete derived flavors
-                if (mentry.deleteDerivedFlavors(doDelete=doit)):
+                if (not mentry.deleteFlavors(doDelete=doit)):
                     return False
-
-                # delete original flavor
-                kaltura.Flavor(checker.original).delete(doit)
 
                 # replace with place_holder video
                 if (not mentry.replaceOriginal(place_holder, doit)):
@@ -194,7 +191,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                 # so check on relevant tag
                 return checker.hasTag(PLACE_HOLDER_VIDEO)
     finally:
-        if (not checker.hasTag(PLACE_HOLDER_VIDEO)):
+        if (doit and not checker.hasTag(PLACE_HOLDER_VIDEO)):
             checker.mentry.log_action(logging.ERROR, doit, 'Replace Video', 'FAILURE')
 
 
