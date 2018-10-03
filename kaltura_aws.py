@@ -2,12 +2,12 @@
 import logging, traceback
 import os
 import sys
-import time
 import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
 
 import kaltura
+import kaltura.api
 import kaltura.aws as aws
 
 PLACE_HOLDER_VIDEO = "flavors_deleted"
@@ -189,7 +189,11 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
             # original flavor size does not match s3 file size
             # fine if this has been processed before
             # so check on relevant tag
-            return checker.hasTag(PLACE_HOLDER_VIDEO)
+            # reset kaltura connection
+            kaltura.api.getClient(True)
+            if checker.hasTag(PLACE_HOLDER_VIDEO):
+                mentry.log_action(logging.INFO, doit, 'Replaced', 'tag: {} ==> Place Holder Video at KMC'.format(PLACE_HOLDER_VIDEO))
+                return True
     return False;
 
 
