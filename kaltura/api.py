@@ -2,7 +2,6 @@
 import logging
 
 logger = logging.getLogger('kaltura')
-logger.addHandler(logging.NullHandler())
 
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
@@ -28,7 +27,7 @@ def startSession(partner_id, user_id, secret):
 
     ks = client.session.start(secret, user_id, ktype, partner_id, expiry, privileges)
     client.setKs(ks)
-    logging.info("Kaltura/Api: connected to %s with %s partnerId:%s" % (config.serviceUrl, user_id, partner_id))
+    logger.info("KALTURA API %s with %s partnerId:%s" % (config.serviceUrl, user_id, partner_id))
     __client__ = client
     return None
 

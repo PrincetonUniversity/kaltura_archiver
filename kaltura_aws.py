@@ -24,6 +24,9 @@ class KalturaArgParser(envvars.ArgumentParser):
                         'videoPlaceholder' : 'PLACEHOLDER_VIDEO|placeholder video|placeholder_video.mp4'}
 
     DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, archive and restore videos to and from AWS storage.
+    
+All actions are performed in DRYRUN mode by default, meaning they are logged but not performed. 
+When executing 'for real' actions are logged ./kaltura.log in addition to loggin to the terminal. 
 
 It  uses the following environment variables
 """
@@ -41,7 +44,7 @@ It  uses the following environment variables
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
-        subparsers.add_parser('config', description='test access to Kaltura KMC, AWS').set_defaults(func=setup)
+        subparsers.add_parser('config', description='test access to Kaltura KMC, AWS').set_defaults(func=check_config)
 
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
@@ -127,11 +130,9 @@ def archive_to_s3(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params)
+    doit = setup(params, 'archive')
     filter = _create_filter(params)
-    doit = params['archive']
     bucket = params['awsBucket']
-    kaltura.logger.info("save_to_aws archive={} {}".format(doit, filter))
     nerror = 0
     for entry in filter:
         done = False
@@ -160,13 +161,11 @@ def replace_videos(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params)
+    doit = setup(params, 'replace')
     filter = _create_filter(params)
-    doit = params['replace']
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
     wait = params['wait']
-    kaltura.logger.info("replace_videos archive={} {}".format(doit, filter))
 
     nerror = 0
     check_ready = []
@@ -196,10 +195,8 @@ def del_flavors(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params)
+    doit = setup(params, 'de;ete')
     filter = _create_filter(params)
-    doit = params['delete']
-    kaltura.logger.info("del_flavors delete={} {}".format(doit, filter))
 
     nerror = 0;
     for entry in filter:
@@ -249,6 +246,10 @@ def del_entry_flavors(mentry, doit):
     else:
         return False
 
+def check_config(params):
+    setup(params, 'loglevel')
+    return 0
+
 def list(params):
     """
     print matching kaltura records
@@ -256,11 +257,9 @@ def list(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params)
+    setup(params, None)
     filter = _create_filter(params)
-    mode = params['mode']
     bucket = params['awsBucket']
-    kaltura.logger.info("list {} {}".format(mode, filter))
 
     if (params['mode'] == 'video'):
         columns = ['lastPlayedDate', 'lastPlayedAt', 'views', 'id', 'totalSize', 'isArchived', 'hasOriginal', 'originalStatus', 'categories', 'categoriesIds', '|', 'tags', '|',  'name']
@@ -310,44 +309,50 @@ def _create_filter(params):
     filter.years_since_played(params['unplayed']).played_within_years(params['played'])
     if (params['noLastPlayed']) :
         filter.undefined_LAST_PLAYED_AT();
+    kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
-def setup(params):
+def setup(params, doit_prop):
+    doit = params[doit_prop] if doit_prop else True
+    if (doit):
+        handler = logging.FileHandler('kaltura.log')
+        formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
+        handler.setFormatter(formatter)
+        kaltura.logger.addHandler(handler)
+
+    logging.root.setLevel(logging.INFO)
+    kaltura.logger.setLevel(params['loglevel'])
+
+    kaltura.logger.info("---")
+    kaltura.logger.info("FUNC  {}".format(params['func']))
+    for k in sorted(params.keys()):
+        if k != 'func' and params[k] != None:
+            kaltura.logger.info("PARAM %s=%s" % (k, '***' if "SECRET" in k.upper() else params[k]))
+
+
     # connect to Kaltura
     kaltura.api.startSession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
 
     # Check for existence of placeholder video
     if not os.path.isfile(params['videoPlaceholder']):
         raise(RuntimeError("Can not access placeholder file '{}'".format(params['videoPlaceholder'])))
-    else:
-        kaltura.logger.info("setup: videoPlaceholder={}".format(params['videoPlaceholder']))
 
     # check on AWS bucket
     bucket = params['awsBucket']
     try:
         s3resource = boto3.resource('s3')
         s3resource.meta.client.head_bucket(Bucket=bucket)
-        kaltura.logger.info("Using AWS bucket {}".format(bucket))
     except Exception as e:
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
 
+    return doit
 
 def _get_env_vars():
     env = envvars.to_value(KalturaArgParser.ENV_VARS)
-    for v in env:
-        kaltura.logger.info("%s=%s" % (v, '***' if "SECRET" in v.upper() else env[v]))
     return env
 
 
 def _main(args):
-    handler = logging.FileHandler('kaltura.log')
-    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
-    handler.setFormatter(formatter)
-    kaltura.logger.addHandler(handler)
-
-    if 'loglevel' in args:
-        kaltura.logger.setLevel(args['loglevel'])
-    kaltura.logger.info("---- {}".format(args))
     params = _get_env_vars()
     params.update(args)
     return params['func'](params)
