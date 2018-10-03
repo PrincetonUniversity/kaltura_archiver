@@ -14,9 +14,6 @@ FLAVORS_DELETED_TAG = "flavors_deleted"
 PLACE_HOLDER_VIDEO = "place_holder_video"
 SAVED_TO_S3 = "archived_to_s3"
 
-# wait time before checking uploaded videos are in READY status
-WAIT_FOR_READY = 1
-
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
                         'secret': 'KALTURA_SECRET|Kaltura secret to access API|',
@@ -65,6 +62,7 @@ It  uses the following environment variables
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         KalturaArgParser._add_filter_parsm(subparser)
+        subparser.add_argument("--wait", "-w",  type=int, default=60, help="wait time in seconds before checking that uploaded original's status is READY")
         subparser.set_defaults(func=replace_videos)
 
         return parser
@@ -167,6 +165,7 @@ def replace_videos(params):
     doit = params['replace']
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
+    wait = params['wait']
     kaltura.logger.info("replace_videos archive={} {}".format(doit, filter))
 
     nerror = 0
@@ -178,9 +177,9 @@ def replace_videos(params):
             check_ready.append(entry)
 
     if (check_ready):
-        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Wait',  '{} sec'.format(WAIT_FOR_READY))
+        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Wait',  '{} sec'.format(wait))
         if (doit):
-            time.sleep(WAIT_FOR_READY)
+            time.sleep(wait)
         kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Check',  'Check that uploaded videos have status READY')
 
     for entry in check_ready:
