@@ -16,7 +16,7 @@ def s3_exists(filename, bucketname):
         _s3.Object(bucketname, filename).load()
         return True
     except botocore.exceptions.ClientError as e:
-        logging.debug("s3_object_exists({}, {}): {}".format(bucketname, filename, e))
+        api.logger.debug("s3_object_exists({}, {}): {}".format(bucketname, filename, e))
         return False
 
 def s3_size(filename, bucketname):
@@ -29,7 +29,7 @@ def s3_size(filename, bucketname):
         o = _s3.Object(bucketname, filename)
         return o.content_length
     except botocore.exceptions.ClientError as e:
-        logging.debug("s3_object_size({}, {}): {}".format(bucketname, filename, e))
+        api.logger.debug("s3_object_size({}, {}): {}".format(bucketname, filename, e))
         return -1
 
 def s3_store(src_file, bucketname, bucketfile, doit=False):

@@ -6,7 +6,6 @@ import logging
 from KalturaClient.Plugins.Core import *
 
 import api
-import mediaentry
 
 class Filter:
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
@@ -25,9 +24,9 @@ class Filter:
         """
         if entryid is not None:
             self.filter.idEqual = entryid
-            logging.debug("Filter.id=%s" % self.filter.idEqual)
+            api.logger.debug("Filter.id=%s" % self.filter.idEqual)
         else:
-            logging.debug("Filter.entryId: NOOP ")
+            api.logger.debug("Filter.entryId: NOOP ")
         return self
 
     def tag(self, tag):
@@ -56,9 +55,9 @@ class Filter:
                 tagfilter.value = tag
             tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
             self.filter.advancedSearch = tagfilter
-            logging.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
+            api.logger.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
         else:
-            logging.debug("Filter.tag: NONE" )
+            api.logger.debug("Filter.tag: NONE" )
         return self
 
     def undefined_LAST_PLAYED_AT(self):
@@ -75,7 +74,7 @@ class Filter:
         self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
         self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
         self.filter.advancedSearch.value = Filter._years_ago(20)
-        logging.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(api.dateString(self.filter.advancedSearch.value)) )
+        api.logger.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(api.dateString(self.filter.advancedSearch.value)) )
         return self
 
     def category(self, categoryId):
@@ -89,9 +88,9 @@ class Filter:
         """
         if (categoryId != None):
             self.filter.categoryAncestorIdIn = categoryId
-            logging.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
+            api.logger.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
         else:
-            logging.debug("Filter.category: NOOP")
+            api.logger.debug("Filter.category: NOOP")
         return self
 
     def years_since_played(self, years):
@@ -117,9 +116,9 @@ class Filter:
                 self.filter.lastPlayedAtLessThanOrEqual = since
             elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
                 self.filter.lastPlayedAtGreaterThanOrEqual = since
-            logging.debug("Filter.{:s} {:s}".format(mode, api.dateString(since)) )
+            api.logger.debug("Filter.{:s} {:s}".format(mode, api.dateString(since)) )
         else:
-            logging.debug("Filter.{:s}: NOOP".format(mode))
+            api.logger.debug("Filter.{:s}: NOOP".format(mode))
         return self
 
     @staticmethod
@@ -180,6 +179,6 @@ class FilterIter:
         except StopIteration as stp:
             self.pager.setPageIndex(self.pager.getPageIndex() + 1)
             self.objects = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
-            logging.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
+            api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
             return next(self.objects)
 

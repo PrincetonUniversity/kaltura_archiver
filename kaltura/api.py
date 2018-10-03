@@ -2,6 +2,7 @@
 import logging
 
 logger = logging.getLogger('kaltura')
+logger.addHandler(logging.NullHandler())
 
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *

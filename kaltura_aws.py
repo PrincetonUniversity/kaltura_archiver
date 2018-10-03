@@ -26,7 +26,8 @@ class KalturaArgParser(envvars.ArgumentParser):
     DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, archive and restore videos to and from AWS storage.
     
 All actions are performed in DRYRUN mode by default, meaning they are logged but not performed. 
-When executing 'for real' actions are logged ./kaltura.log in addition to loggin to the terminal. 
+In addition to logging to the terminal actions are logged ./kaltura.log or kaltura-dryrun.log. 
+The log file is chosen based on the execution mode. 
 
 It  uses the following environment variables
 """
@@ -314,11 +315,10 @@ def _create_filter(params):
 
 def setup(params, doit_prop):
     doit = params[doit_prop] if doit_prop else True
-    if (doit):
-        handler = logging.FileHandler('kaltura.log')
-        formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
-        handler.setFormatter(formatter)
-        kaltura.logger.addHandler(handler)
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
+    handler.setFormatter(formatter)
+    kaltura.logger.addHandler(handler)
 
     logging.root.setLevel(logging.INFO)
     kaltura.logger.setLevel(params['loglevel'])
