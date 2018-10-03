@@ -169,30 +169,29 @@ def replace_videos(params):
 
     return nerror
 
+
 def replace_entry_video(mentry, place_holder, bucket, doit):
     checker = CheckCondition(mentry)
-    try:
-        if (checker.hasOriginal()):
-            if (checker.aws_S3_file(bucket)):
-                # delete derived flavors
-                if (not mentry.deleteFlavors(doDelete=doit)):
-                    return False
+    if (checker.hasOriginal()):
+        if (checker.aws_S3_file(bucket)):
+            # delete derived flavors
+            if (not mentry.deleteFlavors(doDelete=doit)):
+                return False
 
-                # replace with place_holder video
-                if (not mentry.replaceOriginal(place_holder, doit)):
-                    return False
+            # replace with place_holder video
+            if (not mentry.replaceOriginal(place_holder, doit)):
+                return False
 
-                # indicate successful replace
-                mentry.addTag(PLACE_HOLDER_VIDEO, doit)
-                return True
-            else:
-                # original flavor size does not match s3 file size
-                # fine if this has been processed before
-                # so check on relevant tag
-                return checker.hasTag(PLACE_HOLDER_VIDEO)
-    finally:
-        if (doit and not checker.hasTag(PLACE_HOLDER_VIDEO)):
-            checker.mentry.log_action(logging.ERROR, doit, 'Replace Video', 'FAILURE')
+            # indicate successful replace
+            mentry.addTag(PLACE_HOLDER_VIDEO, doit)
+            return True
+        else:
+            # original flavor size does not match s3 file size
+            # fine if this has been processed before
+            # so check on relevant tag
+            return checker.hasTag(PLACE_HOLDER_VIDEO)
+    return False;
+
 
 
 def check_entry_ready(mentry):
