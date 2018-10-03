@@ -10,8 +10,7 @@ import envvars
 import kaltura
 import kaltura.aws as aws
 
-FLAVORS_DELETED_TAG = "flavors_deleted"
-PLACE_HOLDER_VIDEO = "place_holder_video"
+PLACE_HOLDER_VIDEO = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
 
 class KalturaArgParser(envvars.ArgumentParser):
@@ -51,11 +50,6 @@ It  uses the following environment variables
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=list)
-
-        subparser = subparsers.add_parser('del_flavors', description="delete derived flavors of matching videos at Kaltura KMC ")
-        subparser.add_argument("--delete", action="store_true", default=False, help="performs in dryrun mode, unless delete param is given")
-        KalturaArgParser._add_filter_parsm(subparser)
-        subparser.set_defaults(func=del_flavors)
 
         subparser = subparsers.add_parser('archive', description="archive original flavors of matching videos to AWS-s3")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
@@ -143,6 +137,7 @@ def archive_to_s3(params):
         if (checker.hasOriginal() and checker.originalIsReady()):
             if (aws.s3_exists(s3_file, bucket)):
                 checker.mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
+                done = True
             else:
                 # download from kaltura
                 fname = checker.mentry.downloadOriginal(doit)
@@ -187,31 +182,13 @@ def replace_videos(params):
              nerror += 1
     return nerror
 
-def del_flavors(params):
-    """
-    delete derived flavors from  matching kaltura records from matching entries
-
-    skip entries that are not marked with the tag
-
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    doit = setup(params, 'de;ete')
-    filter = _create_filter(params)
-
-    nerror = 0;
-    for entry in filter:
-        if (not del_entry_flavors(kaltura.MediaEntry(entry), doit)):
-            nerror += 1
-    return nerror
-
 def replace_entry_video(mentry, place_holder, bucket, doit):
     checker = CheckCondition(mentry)
     try:
         if (checker.hasOriginal()):
             if (checker.aws_S3_file(bucket)):
                 # delete derived flavors
-                if not del_entry_flavors(mentry, doit):
+                if (mentry.deleteDerivedFlavors(doDelete=doit)):
                     return False
 
                 # delete original flavor
@@ -238,14 +215,6 @@ def check_entry_ready(mentry):
     checker = CheckCondition(mentry)
     return checker.hasOriginal() and checker.originalIsReady()
 
-
-def del_entry_flavors(mentry, doit):
-    # delete entry flavors returns False when there is no original
-    if (mentry.deleteDerivedFlavors(doDelete=doit)):
-        mentry.addTag(FLAVORS_DELETED_TAG, doit)
-        return True
-    else:
-        return False
 
 def check_config(params):
     setup(params, 'loglevel')
