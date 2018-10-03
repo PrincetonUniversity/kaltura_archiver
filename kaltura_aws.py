@@ -2,6 +2,7 @@
 import logging, traceback
 import os
 import sys
+import time
 import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
@@ -13,6 +14,8 @@ FLAVORS_DELETED_TAG = "flavors_deleted"
 PLACE_HOLDER_VIDEO = "place_holder_video"
 SAVED_TO_S3 = "archived_to_s3"
 
+# wait time before checking uploaded videos are in READY status
+WAIT_FOR_READY = 1
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
@@ -76,6 +79,49 @@ It  uses the following environment variables
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         return None
 
+
+class CheckCondition:
+    def __init__(self, mentry):
+        self.mentry = mentry
+
+    def hasOriginal(self):
+        self.original = self.mentry.getOriginalFlavor()
+        yes = self.original != None
+        self._log_action(yes, 'Entry has Original')
+        return yes
+
+    def originalIsReady(self):
+        yes = kaltura.Flavor(self.original).isReady()
+        message = 'Original Flavor {} status == READY'.format(self.original.getId())
+        self._log_action(yes, message)
+        return yes
+
+    def doesNotHaveTag(self, tag):
+        yes = not (tag in self.mentry.entry.getTags())
+        message = 'Entry does not have tag {}'.format(tag)
+        self._log_action(yes, message)
+        return yes
+
+    def hasTag(self, tag):
+        yes = tag in self.mentry.entry.getTags()
+        message = 'Entry has tag {}'.format(tag)
+        self._log_action(yes, message)
+        return yes
+
+    def aws_S3_file(self, bucket):
+        s3_file = self.mentry.entry.getId()
+        s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
+        yes = abs(s3_file_size_kb - self.original.getSize()) <= 1
+        message = 'Size(s3://{}/{})={} kb equals  size of Flavor {} '.format(bucket, s3_file, s3_file_size_kb, self.original.getSize())
+        self._log_action(yes, message)
+        return yes
+
+    def _log_action(self, yes, message):
+        log_level = logging.DEBUG if (yes) else logging.INFO
+        result = '' if (yes) else 'FAILURE - '
+        self.mentry.log_action(log_level, True, "Check", '{}{}'.format(result, message))
+
+
 def archive_to_s3(params):
     """
     save original flavors to aws  for  matching kaltura records
@@ -88,44 +134,27 @@ def archive_to_s3(params):
     doit = params['archive']
     bucket = params['awsBucket']
     kaltura.logger.info("save_to_aws archive={} {}".format(doit, filter))
-
-    failed_save = []
-    no_orig = []
+    nerror = 0
     for entry in filter:
-        mentry = kaltura.MediaEntry(entry)
-        original = mentry.getOriginalFlavor()
+        done = False
         s3_file = entry.getId()
 
-        if (aws.s3_exists(s3_file, bucket)):
-            mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
+        checker = CheckCondition(kaltura.MediaEntry(entry))
+        if (checker.hasOriginal() and checker.originalIsReady()):
+            if (aws.s3_exists(s3_file, bucket)):
+                checker.mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
+            else:
+                # download from kaltura
+                fname = checker.mentry.downloadOriginal(doit)
+                if (fname):
+                    # store to S3
+                    aws.s3_store(fname, bucket, entry.getId(), doit)
+                    kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+                    done = True
+        if (not done):
+            nerror += 1
 
-        if (not original):
-            mentry.log_action(logging.ERROR, doit, "Abort", 'Entry has no Original')
-            no_orig.append(entry)
-            continue
-        mentry.log_action(logging.DEBUG, doit, "Check", 'Entry has Original')
-
-        status =  kaltura.FlavorAssetStatus.str(original.getStatus())
-        if not kaltura.Flavor(original).isReady():
-            mentry.log_action(logging.ERROR, doit, "Abort", 'Original Flavor {}: status == {}; need READY'.format(original.getId(),status))
-            continue
-        mentry.log_action(logging.DEBUG, doit, "Check", 'Original Flavor {}: status == {}; need READY'.format(original.getId(),status))
-
-        if (not aws.s3_exists(s3_file, bucket)):
-            # download from kaltura
-            fname = mentry.downloadOriginal(doit)
-            if (not fname):
-                continue
-
-            # store to S3
-            aws.s3_store(fname, bucket, entry.getId(), doit)
-            kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
-
-    if (failed_save):
-        kaltura.logger.error("FAILED to save original for {}".format(",".join(e.getId() for e in failed_save)))
-    if (no_orig):
-        kaltura.logger.warn("Entries without original flavor: {}".format(",".join(e.getId() for e in no_orig)))
-    return None
+    return nerror
 
 def replace_videos(params):
     """
@@ -140,63 +169,24 @@ def replace_videos(params):
     place_holder = params['videoPlaceholder']
     kaltura.logger.info("replace_videos archive={} {}".format(doit, filter))
 
-    failed_replace = []
-
+    nerror = 0
+    check_ready = []
     for entry in filter:
         if (not replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)):
-                failed_replace.append(entry)
+            nerror += 1
+        else:
+            check_ready.append(entry)
 
-    if (failed_replace):
-        kaltura.logger.error("FAILED to replace original for {}".format(",".join(e.getId() for e in failed_replace)))
-    return None
+    if (check_ready):
+        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Wait',  '{} sec'.format(WAIT_FOR_READY))
+        if (doit):
+            time.sleep(WAIT_FOR_READY)
+        kaltura.api.log_action(logging.INFO, doit, 'Entry', '*', 'Check',  'Check that uploaded videos have status READY')
 
-
-def replace_entry_video(mentry, place_holder, bucket, doit):
-    # bail if there is no original
-    original = mentry.getOriginalFlavor()
-    if (original == None):
-        mentry.log_action(logging.ERROR, doit, "Abort", 'Entry has no ORIGINAL')
-        return False
-    mentry.log_action(logging.DEBUG, doit, "Check", 'Entry has ORIGINAL')
-
-    # bail if no have healthy s3 back up
-    s3_file = mentry.entry.getId()
-    if (not have_equal_sizes(original, s3_file, bucket, doit)):
-        mentry.log_action(logging.ERROR, doit, "Abort",
-                          'Size Mismatch - s3://{}/{}: Flavor {} has size {}kb'.
-                         format(bucket, s3_file, original.getId(), original.getSize()))
-        return False
-    mentry.log_action(logging.DEBUG, doit, "Size Match",
-                  's3://{}/{}: Flavor {} has size {}kb'.
-                  format(bucket, s3_file, original.getId(), original.getSize()))
-
-    # delete derived flavors
-    if not del_entry_flavors(mentry, doit):
-        return False
-
-    # delete original flavor
-    kaltura.Flavor(original).delete(doit)
-
-    # replace with place_holder video
-    if (not mentry.replaceOriginal(place_holder, doit)):
-        return False
-
-    # indicate successful replace
-    mentry.addTag(PLACE_HOLDER_VIDEO, doit)
-    return True
-
-
-def del_entry_flavors(mentry, doit):
-    # delete entry flavors returns False when there is no original
-    if (mentry.deleteDerivedFlavors(doDelete=doit)):
-        mentry.addTag(FLAVORS_DELETED_TAG, doit)
-        return True
-    else:
-        return False
-
-def have_equal_sizes(original, s3_file, bucket, doit):
-    s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
-    return abs(s3_file_size_kb - original.getSize()) <= 1
+    for entry in check_ready:
+        if (not check_entry_ready(kaltura.MediaEntry(entry))):
+             nerror += 1
+    return nerror
 
 def del_flavors(params):
     """
@@ -212,13 +202,53 @@ def del_flavors(params):
     doit = params['delete']
     kaltura.logger.info("del_flavors delete={} {}".format(doit, filter))
 
-    failed = []
+    nerror = 0;
     for entry in filter:
         if (not del_entry_flavors(kaltura.MediaEntry(entry), doit)):
-            failed.append(entry)
-    if (failed):
-        kaltura.logger.error("FAILED to delete derived flavors from {}".format(",".join(e.getId() for e in failed)))
-    return None
+            nerror += 1
+    return nerror
+
+def replace_entry_video(mentry, place_holder, bucket, doit):
+    checker = CheckCondition(mentry)
+    try:
+        if (checker.hasOriginal()):
+            if (checker.aws_S3_file(bucket)):
+                # delete derived flavors
+                if not del_entry_flavors(mentry, doit):
+                    return False
+
+                # delete original flavor
+                kaltura.Flavor(checker.original).delete(doit)
+
+                # replace with place_holder video
+                if (not mentry.replaceOriginal(place_holder, doit)):
+                    return False
+
+                # indicate successful replace
+                mentry.addTag(PLACE_HOLDER_VIDEO, doit)
+                return True
+            else:
+                # original flavor size does not match s3 file size
+                # fine if this has been processed before
+                # so check on relevant tag
+                return checker.hasTag(PLACE_HOLDER_VIDEO)
+    finally:
+        if (not checker.hasTag(PLACE_HOLDER_VIDEO)):
+            checker.mentry.log_action(logging.ERROR, doit, 'Replace Video', 'FAILURE')
+
+
+def check_entry_ready(mentry):
+    checker = CheckCondition(mentry)
+    return checker.hasOriginal() and checker.originalIsReady()
+
+
+def del_entry_flavors(mentry, doit):
+    # delete entry flavors returns False when there is no original
+    if (mentry.deleteDerivedFlavors(doDelete=doit)):
+        mentry.addTag(FLAVORS_DELETED_TAG, doit)
+        return True
+    else:
+        return False
 
 def list(params):
     """
@@ -321,17 +351,17 @@ def _main(args):
     kaltura.logger.info("---- {}".format(args))
     params = _get_env_vars()
     params.update(args)
-    params['func'](params)
+    return params['func'](params)
 
 if __name__ == '__main__':
     parser = KalturaArgParser.create()
     try:
         args = parser.parse_args()
-        _main(vars(args))
-        sys.exit(0)
+        status = _main(vars(args))
+        sys.exit(status)
     except Exception as e:
         print("\n" + str(e) + "\n")
         parser.print_usage()
-        if (not isinstance(e, RuntimeError)):
+        if (True or not isinstance(e, RuntimeError)):
             traceback.print_exc()
         sys.exit(-1)
