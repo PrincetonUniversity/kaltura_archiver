@@ -130,42 +130,42 @@ def matching_aws_s3_file(original, s3_file, bucket):
     return abs(s3_file_size_kb - original.getSize()) <= 1
 
 
-def entry_info(mentry, bucket):
-    info = {}
+def entry_health_check(mentry, bucket):
     original  = mentry.getOriginalFlavor()
-    info['original'] = original.getId() if original else None
-    info['originalStatus'] = kaltura.FlavorAssetStatus.str(original.getStatus()) if original else None
-    info['originalSize'] = original.getSize() if original else None
-    info['s3Exists'] = aws.s3_exists(mentry.entry.getId(), bucket)
-    info['s3Size'] = aws.s3_size(mentry.entry.getId(), bucket) if info['s3Exists'] else None
-    for k in [SAVED_TO_S3,  PLACE_HOLDER_VIDEO]:
-        info[k] = k in mentry.entry.getTags()
+    entry = mentry.entry
 
     # check whether item is 'healthy'
     # has original in READY state
     healthy = original != None and kaltura.Flavor(original).isReady()
+    explanation = ''
     if (not healthy):
-        info['status'] = 'ERROR: No healthy Original'
+        explanation= 'ERROR: No healthy Original'
+
     # if there is an s3 entry it should be tagged SAVED_TO_S3
-    if healthy and  info['s3Exists'] and not info[SAVED_TO_S3]:
-        info['status'] = 'ERROR: in bucket {} - but no {} tag'.format(bucket, SAVED_TO_S3)
+    s3Exists = aws.s3_exists(entry.getId(), bucket)
+    saved_tag = SAVED_TO_S3 in entry.getTags()
+    if healthy and  s3Exists and not saved_tag:
+        explanation= 'ERROR: in bucket {} - but no {} tag'.format(bucket, SAVED_TO_S3)
         healthy = False
     # if it is tagged SAVED_TO_S3 there should be an s3 entry
-    if healthy and  info[SAVED_TO_S3] and not info['s3Exists']:
-        info['status'] = 'ERROR: has tag {} - but not in bucket'.format(SAVED_TO_S3, bucket)
+    if healthy and  saved_tag and not s3Exists:
+        explanation= 'ERROR: has tag {} - but not in bucket {}'.format(SAVED_TO_S3, bucket)
         healthy = False
+
     # if it is tagged PLACE_HOLDER_VIDEO it should also be tagged  SAVED_TO_S3
-    if healthy and  info[PLACE_HOLDER_VIDEO] and not info[SAVED_TO_S3]:
-        info['status'] = 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
+    replaced_tag = PLACE_HOLDER_VIDEO in entry.getTags()
+    if healthy and  replaced_tag and not saved_tag:
+        explanation= 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
-    # if it is not tagged PLACE_HOLDER_VIDEO original flavor and s3 entry size should match
-    if healthy and  info[PLACE_HOLDER_VIDEO] and not matching_aws_s3_file(original, mentry.entry.getId(), bucket):
-        info['status'] = 'ERROR: has tag {} - bucket entry / original flavor size-mismatch '.format(PLACE_HOLDER_VIDEO)
+
+    # if it is saved but  tagged PLACE_HOLDER_VIDEO original flavor then s3 entry size should match
+    if healthy and  not replaced_tag and saved_tag and not matching_aws_s3_file(original, mentry.entry.getId(), bucket):
+        explanation= 'ERROR: no tag {}; but has tag {} - bucket entry / original flavor size-mismatch '.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
-    info['healthy'] = healthy
+
     if (healthy):
-        info['status'] = 'HEALTHY'
-    return info
+        explanation= 'HEALTHY'
+    return  healthy, explanation
 
 
 def archive_to_s3(params):
@@ -231,15 +231,22 @@ def health_check(params):
 
     columns = []
     nerror = 0
+
+
+    print('\t'.join(columns))
+    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
+               PLACE_HOLDER_VIDEO, SAVED_TO_S3]
+    print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, '---'])
     for entry in filter:
         mentry = kaltura.MediaEntry(entry);
-        status = entry_info(mentry, bucket)
-        if (not columns):
-            columns = sorted(status.keys())
-            print('\t'.join(columns))
+        healthy, message = entry_health_check(mentry, bucket)
+        vals = [mentry.report_str(kaltura.ENTRY_ID), str(healthy).ljust(len('status-ok'))]
+        vals = vals + [mentry.report_str(c) for c in columns]
+        vals = vals + [str(aws.s3_size(entry.getId(), bucket)/1024), mentry.report_str(kaltura.ORIGINAL_SIZE), message]
 
-        print "\t".join([repr(status[c]) for c in columns])
-        if (not status['healthy']):
+        print "\t".join(v.decode('utf-8') for v in vals)
+        if (not healthy):
+            mentry.log_action(logging.ERROR, True, 'STATUS', message)
             nerror +=1
     return nerror
 
@@ -270,11 +277,6 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
     return False;
 
 
-
-def is_healthy_entry(mentry, place_holder, bucket, doit):
-    original = mentry.getOriginalFlavor()
-    return False;
-
 def check_entry_ready(mentry):
     checker = CheckAndLog(mentry)
     return checker.hasOriginal() and checker.originalIsReady()
@@ -303,8 +305,7 @@ def list(params):
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
             vals = [kentry.report_str(c) for c in columns]
-            s = "\t".join(v.decode('utf-8') for v in vals)
-            print(s)
+            print("\t".join(v.decode('utf-8') for v in vals))
     else:
         columns = [kaltura.ENTRY_ID, kaltura.FLAVOR_ID, kaltura.ORIGINAL, kaltura.SIZE,
                    kaltura.CREATED_AT, kaltura.DELETED_AT,
@@ -315,8 +316,7 @@ def list(params):
             for f in kaltura.FlavorAssetIterator(entry):
                 kf = kaltura.Flavor(f)
                 vals = [kf.report_str(c) for c in columns]
-                s = "\t".join(v.decode('utf-8') for v in vals)
-                print(s)
+                print("\t".join(v.decode('utf-8') for v in vals))
     return None
 
 

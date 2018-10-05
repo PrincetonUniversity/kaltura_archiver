@@ -11,7 +11,8 @@ LAST_PLAYED = 'lastPlayed'
 LAST_PLAYED_DATE = 'lastPlayedDate'
 VIEWS = 'views'
 ORIGINAL = 'original'
-ORIGINAL_STATUS = 'original-status'
+ORIGINAL_STATUS = 'orig-status'
+ORIGINAL_SIZE = 'orig-size'
 TOTAL_SIZE = 'total-size(KB)'
 SIZE = 'size(KB)'
 TAGS = 'tags'
@@ -154,8 +155,11 @@ class MediaEntry:
         if column == ORIGINAL:
             return '{:>10}'.format(original.getId() if original else  '')
         if column == ORIGINAL_STATUS:
-            return FlavorAssetStatus.str(original.getStatus()) if original else 'MISSING'
-        return str(column in self.entry.getTags())
+            return (FlavorAssetStatus.str(original.getStatus()) if original else 'MISSING').rjust(len(ORIGINAL_STATUS))
+        if column == ORIGINAL_SIZE:
+            return "{:>10}".format(original.getSize() if original else '')
+        has_tag = column in self.entry.getTags()
+        return column if has_tag else ''.ljust(len(column))
 
 
     def log_action(self, log_level, doIt, action, message):
