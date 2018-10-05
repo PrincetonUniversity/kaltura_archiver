@@ -5,8 +5,27 @@ import urllib
 
 from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource, KalturaFlavorAssetStatus
 
+ENTRY_ID = 'entry-id'
+FLAVOR_ID = 'flavor-id'
+LAST_PLAYED = 'lastPlayed'
+LAST_PLAYED_DATE = 'lastPlayedDate'
+VIEWS = 'views'
+ORIGINAL = 'original'
+ORIGINAL_STATUS = 'original-status'
+TOTAL_SIZE = 'total-size(KB)'
+SIZE = 'size(KB)'
+TAGS = 'tags'
+CATEGORIES = 'categories'
+CATEGORIES_IDS = 'categoryIds'
+NAME = 'name'
+STATUS = 'status'
+CREATED_AT = 'created'
+CREATED_AT_DATE = 'createdDate'
+DELETED_AT = 'deleted'
+DELETED_AT_DATE = 'deletedDate'
 
 class MediaEntry:
+
     def __init__(self, entry):
         if (not isinstance(entry, KalturaMediaEntry)):
             raise RuntimeError("Can't create MediaEntry with {} instance".format(entry))
@@ -112,6 +131,33 @@ class MediaEntry:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
 
+    def report_str(self, column):
+        if column == ENTRY_ID:
+            return self.entry.getId()
+        if column ==  LAST_PLAYED_DATE:
+            return "{:>10}".format(api.dateString(self.entry.getLastPlayedAt()))
+        if column == LAST_PLAYED:
+            return "{:>12}".format(self.entry.getLastPlayedAt())
+        if column == VIEWS:
+            return str(self.entry.getViews())
+        if column == TOTAL_SIZE:
+            return "{:>10}".format(self.getTotalSize())
+        if column == NAME:
+            return self.entry.getName().encode('utf-8')
+        if column == TAGS:
+            return self.entry.getTags().encode('utf-8')
+        if column == CATEGORIES:
+            return self.entry.getCategories().encode('utf-8')
+        if column == CATEGORIES_IDS:
+            return '{:>15}'.format(self.entry.getCategoriesIds().encode('utf-8'))
+        original = self.getOriginalFlavor()
+        if column == ORIGINAL:
+            return '{:>10}'.format(original.getId() if original else  '')
+        if column == ORIGINAL_STATUS:
+            return FlavorAssetStatus.str(original.getStatus()) if original else 'MISSING'
+        return str(column in self.entry.getTags())
+
+
     def log_action(self, log_level, doIt, action, message):
         api.log_action(log_level, doIt,'Entry', self.entry.getId(), action, message)
 
@@ -133,6 +179,26 @@ class Flavor:
 
     def log_action(self, level, doIt, action, message):
         return api.log_action(level, doIt, 'Entry', self.flavor.getEntryId(), action, "{} {}".format(Flavor(self.flavor), message))
+
+
+    def report_str(self, column):
+        if column ==  FLAVOR_ID:
+            return  self.flavor.getId()
+        if column ==  ENTRY_ID:
+            return  self.flavor.getEntryId()
+        if column ==  ORIGINAL:
+            return str(self.flavor.getIsOriginal())
+        if column == CREATED_AT:
+            return "{:>12}".format(self.flavor.getCreatedAt())
+        if column == DELETED_AT:
+            return str(self.flavor.getDeletedAt())
+        if column == DELETED_AT_DATE:
+            return "{:>10}".format(api.dateString(self.flavor.getDeletedAt()))
+        if column == SIZE:
+            return "{:>10}".format(self.flavor.getSize())
+        if column == STATUS:
+            return FlavorAssetStatus.str(self.flavor.getStatus())
+        return 'UNDEFINED'
 
     def __repr__(self):
         f = self.flavor
