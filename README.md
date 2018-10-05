@@ -46,17 +46,27 @@ if entry.original_flavor != None
 and if entry.original_flavor.status == READY 
 and AWS bucket contains a file with the entries id 
 and that file has the same size as the original flavor
-    delete derived flavors 
-    apply tag 'flavors_deleted' 
-    delete original 
+    delete all flavors including original  
     upload place holder video; create new thumbnail;
-    if successfull apply 'place_holder_video' tag 
+    apply tag 'flavors_deleted' 
+~~~
+
+TODO: Check that process was successfull, that is check each entry passes the follwowing tests:
+~~~
+has original flavor in READY status 
+if AWS S3 contains a file with the entries ID 
+    then the entry has the  'archived_to_s3' tag 
+if the entry dows not have the  'archived_to_s3' tag 
+    then there is not entry in AWS 
+if the entry does not have the 'flavors_deleted' tag 
+    then the filesize of the AWS s3 entry matches the ORIGINAL flavors file size
 ~~~
 
 Run on command line:
 ~~~
 kaltura_aws.py  archive  [filter-options]
 kaltura_aws.py  replace_video [filter-options]
+kaltura_aws.py  status [filter-options]
 ~~~
    
 
