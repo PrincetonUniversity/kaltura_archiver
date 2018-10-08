@@ -56,6 +56,11 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=archive_to_s3)
 
+        subparser = subparsers.add_parser('restore', description="restore matching videos from AWS-s3")
+        subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
+        KalturaArgParser._add_filter_parsm(subparser)
+        subparser.set_defaults(func=restore_from_s3)
+
         subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
@@ -206,6 +211,35 @@ def archive_to_s3(params):
 
     return nerror
 
+def restore_from_s3(params):
+    """
+    restore original flavor from s3   for  matching kaltura records
+
+    :param params: hash that contains kaltura connection information as well as filtering options given for the restore action
+    :return:  number of error s envountered
+    """
+    doit = setup(params, 'restore')
+    filter = _create_filter(params)
+    bucket = params['awsBucket']
+    nerror = 0
+    for entry in filter:
+        print(entry)
+        s3_file = entry.getId()
+
+        checker = CheckAndLog(kaltura.MediaEntry(entry))
+        if (checker.hasOriginal() and checker.originalIsReady()):
+            if (not aws.s3_exists(s3_file, bucket)):
+                checker.mentry.log_action(logging.ERROR, doit, "Restore", 'Could not find  s3://{}/{}'.format(bucket, s3_file))
+                nerror += 1
+            else:
+                if (checker.hasTag(PLACE_HOLDER_VIDEO)):
+                    checker.mentry.log_action(logging.INFO, doit, "Restore", 'TODO need to restore')
+                else:
+                    checker.mentry.log_action(logging.INFO, doit, "Restore", 'Original Flavor is original vidoe')
+        else:
+            nerror += 1
+
+    return nerror
 
 def download(params):
     """
@@ -350,7 +384,7 @@ def _create_filter(params):
         filter.category(params['category'])
         filter.years_since_played(params['unplayed']).played_within_years(params['played'])
         if (params['noLastPlayed']) :
-             filter.undefined_LAST_PLAYED_AT();
+             filter.undefined_LAST_PLAYED_AT()
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
@@ -385,7 +419,6 @@ def setup(params, doit_prop):
         s3resource.meta.client.head_bucket(Bucket=bucket)
     except Exception as e:
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
-
     return doit
 
 def _get_env_vars():
