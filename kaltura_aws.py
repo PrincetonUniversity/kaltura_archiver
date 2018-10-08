@@ -63,6 +63,9 @@ It  uses the following environment variables
         subparser.add_argument("--wait", "-w",  type=int, default=60, help="wait time in seconds before checking that uploaded original's status is READY")
         subparser.set_defaults(func=replace_videos)
 
+        subparser = subparsers.add_parser('download', description="download original for given video ")
+        subparser.add_argument("--id", "-i",  required=True, help="kaltura media entry id")
+        subparser.set_defaults(func=download)
         return parser
 
     @staticmethod
@@ -150,6 +153,26 @@ def archive_to_s3(params):
             nerror += 1
 
     return nerror
+
+
+def download(params):
+    """
+    save original flavors to aws  for  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    doit = setup(params, None)
+    filter = _create_filter(params)
+    entry =   next(iter(filter))
+
+    checker = CheckCondition(kaltura.MediaEntry(entry))
+    if (checker.hasOriginal() and checker.originalIsReady()):
+        fname = checker.mentry.downloadOriginal(doit)
+        print("downloded to " + fname)
+        return 0
+    else:
+        return 1
 
 def replace_videos(params):
     """
@@ -262,10 +285,15 @@ def list(params):
 
 def _create_filter(params):
     filter = kaltura.Filter()
-    filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
-    filter.years_since_played(params['unplayed']).played_within_years(params['played'])
-    if (params['noLastPlayed']) :
-        filter.undefined_LAST_PLAYED_AT();
+    filter.entry_id(params['id'])
+    if 'tag' in params:
+        # implies all the other tags are there too
+        # see ArgParser
+        filter.tag(params['tag'])
+        filter.category(params['category'])
+        filter.years_since_played(params['unplayed']).played_within_years(params['played'])
+        if (params['noLastPlayed']) :
+             filter.undefined_LAST_PLAYED_AT();
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
