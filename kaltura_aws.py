@@ -160,7 +160,7 @@ def entry_health_check(mentry, bucket):
 
     # if it is saved but  tagged PLACE_HOLDER_VIDEO original flavor then s3 entry size should match
     if healthy and  not replaced_tag and saved_tag and not matching_aws_s3_file(original, mentry.entry.getId(), bucket):
-        explanation= 'ERROR: no tag {}; but has tag {} - bucket entry / original flavor size-mismatch '.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
+        explanation= 'ERROR: is {} but not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         healthy = False
 
     if (healthy):
