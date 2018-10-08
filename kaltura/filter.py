@@ -111,7 +111,6 @@ class Filter:
         """
         if years is not None:
             since = Filter._years_ago(years)
-            print(since.__class__)
             if (mode == 'lastPlayedAtLessThanOrEqual'):
                 self.filter.lastPlayedAtLessThanOrEqual = since
             elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
