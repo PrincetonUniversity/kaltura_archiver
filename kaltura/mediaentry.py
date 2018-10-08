@@ -132,6 +132,18 @@ class MediaEntry:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
 
+    def delTags(self, remove_tags, doUpdate=False):
+        mediaEntry = KalturaMediaEntry()
+        tags = self.entry.tags.split(',')
+        for t in remove_tags:
+            tags.remove(t)
+        mediaEntry.tags = ",".join(tags)
+        self.log_action(logging.INFO, doUpdate, 'Del Tags', "'{}' tags -> '{}'".format(','.join(tags), mediaEntry.tags))
+        if doUpdate:
+            api.getClient().media.update(self.entry.getId(), mediaEntry)
+        return None
+
+
     def report_str(self, column):
         if column == ENTRY_ID:
             return self.entry.getId()

@@ -2,6 +2,8 @@
 import logging, traceback
 import os
 import sys
+import tempfile
+
 import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
@@ -12,6 +14,7 @@ import kaltura.aws as aws
 
 PLACE_HOLDER_VIDEO = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
+
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
@@ -223,23 +226,10 @@ def restore_from_s3(params):
     bucket = params['awsBucket']
     nerror = 0
     for entry in filter:
-        print(entry)
-        s3_file = entry.getId()
-
-        checker = CheckAndLog(kaltura.MediaEntry(entry))
-        if (checker.hasOriginal() and checker.originalIsReady()):
-            if (not aws.s3_exists(s3_file, bucket)):
-                checker.mentry.log_action(logging.ERROR, doit, "Restore", 'Could not find  s3://{}/{}'.format(bucket, s3_file))
-                nerror += 1
-            else:
-                if (checker.hasTag(PLACE_HOLDER_VIDEO)):
-                    checker.mentry.log_action(logging.INFO, doit, "Restore", 'TODO need to restore')
-                else:
-                    checker.mentry.log_action(logging.INFO, doit, "Restore", 'Original Flavor is original vidoe')
-        else:
+        if (not restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, doit)):
             nerror += 1
+    return nerror;
 
-    return nerror
 
 def download(params):
     """
@@ -334,6 +324,43 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                 mentry.log_action(logging.INFO, doit, 'Replaced', 'tag: {} ==> Place Holder Video at KMC'.format(PLACE_HOLDER_VIDEO))
                 return True
     return False;
+
+
+def restore_entry_from_s3(mentry, bucket, doit):
+    checker = CheckAndLog(mentry)
+    s3_file = mentry.entry.getId()
+    if not (checker.hasOriginal() and checker.originalIsReady()):
+        return False
+
+    if (not aws.s3_exists(s3_file, bucket)):
+        checker.mentry.log_action(logging.ERROR, doit, "Restore", 'Could not find  s3://{}/{}'.format(bucket, s3_file))
+        return False
+    if (not checker.hasTag(PLACE_HOLDER_VIDEO)):
+        checker.mentry.log_action(logging.INFO, doit, "Restore", 'Original Flavor is original video')
+        return False
+
+    # see whether we can get the S3 file - might still be in glacier
+    if (aws.s3_restore(mentry.entry.getId()), bucket, doit):
+        # download from S3
+        to_file = tempfile.mkstemp()[1]
+        aws.s3_download(to_file, bucket, mentry.entry.getId(), doit)
+
+        # delete all flavors
+        if (not mentry.deleteFlavors(doDelete=doit)):
+            return False
+        # replace with original from s3
+        if (not mentry.replaceOriginal(to_file, doit)):
+            return False
+        # indicate that this is not this is not the place_holder (but original) video
+        mentry.delTags([PLACE_HOLDER_VIDEO])
+
+    # either succesfull restore - or have to try again when video is back from glacier
+    return True
+
+
+def check_entry_ready(mentry):
+    checker = CheckAndLog(mentry)
+    return checker.hasOriginal() and checker.originalIsReady()
 
 
 def check_config(params):
