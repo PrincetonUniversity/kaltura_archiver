@@ -329,10 +329,6 @@ def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
     :param entryid: id of a specific video
     """
 
-    #TODO:  delete this after testing
-    entryid = "1_6cwwzio0"
-
-    # Get list
     filter = KalturaMediaEntryFilter()
 
     # filter.orderBy = "-createdAt" # Newest first
@@ -350,9 +346,12 @@ def _constructSearchFilter(yearssinceplay, tag, categoryid, entryid):
         if tag.startswith("!"):
             tagfilter.not_ = True
             tagfilter.value = tag[1:]
+            logging.debug("Will search for videos NOT having tag: %s" % tagfilter.value)
 
         else:
             tagfilter.value = tag
+            logging.debug("Will search for videos having tag: %s" % tagfilter.value)
+
 
         tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
 
