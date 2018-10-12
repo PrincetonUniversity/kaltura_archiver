@@ -104,6 +104,7 @@ check status of entries, that is check each matching entry for the following:
 class CheckAndLog:
     def __init__(self, mentry):
         self.mentry = mentry
+        self.entry = self.mentry.entry
 
     def hasOriginal(self):
         self.original = self.mentry.getOriginalFlavor()
@@ -124,13 +125,13 @@ class CheckAndLog:
         return yes
 
     def hasTag(self, tag):
-        yes = tag in self.mentry.entry.getTags()
+        yes = tag in self.entry.getTags()
         message = 'Entry has tag {}'.format(tag)
         self._log_action(yes, message)
         return yes
 
     def aws_S3_file(self, bucket):
-        yes = matching_aws_s3_file(self.original, self.mentry.getId(), bucket)
+        yes = matching_aws_s3_file(self.original, self.entry.getId(), bucket)
         message = 'Size-Mismatch (s3://{}/{}) Orginal Flavor Size'.format(bucket, self.mentry.entry.getId())
         self._log_action(yes, message)
         return yes
