@@ -24,13 +24,15 @@ The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based
  3. category id 
  3. tag value 
 
-All actions, like downlading original flavors and storing in AWS, deleting derived flavors, deleting the original source video, 
-or restoring sources and recreating derivates are performed in dryRun mode by default, that is the script logs actions but does not actually perform them. 
+Critera can be combined, except for selecting by tag and selecting by 'no lastPlayedAt'.
 
-### Archiving Videos
-Apply the following steps with the same video selection criterium, eg apply to all videos without a lastPlayedAt property:
+All actions that trigger changes, lieke archiving videos in s3 or replacing with the place holder video are 
+perfomed in dryRun mode by default. 
 
-Save to S3 pseudo code
+### kaltura_aws subcommands 
+
+
+#### archive 
 ~~~
 if entry.original_flavor != None 
 and if entry.original_flavor.status == READY 
@@ -40,7 +42,8 @@ and AWS bucket does not contain a file with the entries id
 ~~~
 
 
-Replace with Place Holder video pseudo code
+#### replace_video 
+
 ~~~
 if entry.original_flavor != None 
 and if entry.original_flavor.status == READY 
@@ -51,24 +54,37 @@ and that file has the same size as the original flavor
     apply tag 'flavors_deleted' 
 ~~~
 
-TODO: Check that process was successfull, that is check each entry passes the follwowing tests:
+#### status
+
+check the following invariant - see kaltura_aws.entry_health_check method
+
 ~~~
 has original flavor in READY status 
 if AWS S3 contains a file with the entries ID 
     then the entry has the  'archived_to_s3' tag 
-if the entry dows not have the  'archived_to_s3' tag 
-    then there is not entry in AWS 
+if the entry does not have the  'archived_to_s3' tag 
+    then there is no entry in AWS 
+if the entry dhas the  'flavors_deleted' tag 
+    it should also have the 'archived_to_s3' tag
+if the entry dows not have 'flavors_deleted' and has 'archived_to_s3' tag  
+    size of original flavor and size of s3 entry should match  
 if the entry does not have the 'flavors_deleted' tag 
     then the filesize of the AWS s3 entry matches the ORIGINAL flavors file size
 ~~~
 
-Run on command line:
+## How to use 
+
+to archive and replace with the place holder video choose a filter option 
+that captures the videos you want to work on, then do: 
 ~~~
+
 kaltura_aws.py  archive  [filter-options]
 kaltura_aws.py  replace_video [filter-options]
 kaltura_aws.py  status [filter-options]
 ~~~
    
+The status command should list all selected videos in a HEALTHY state and all videos 
+should be tagged 'archived_to_s3' and 'flavors_deleted' 
 
 ### Restoring Videos
 

@@ -161,7 +161,7 @@ def entry_health_check(mentry, bucket):
         explanation= 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
 
-    # if it is saved but  tagged PLACE_HOLDER_VIDEO original flavor then s3 entry size should match
+    # if it is saved but  not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
     if healthy and  not replaced_tag and saved_tag and not matching_aws_s3_file(original, mentry.entry.getId(), bucket):
         explanation= 'ERROR: is {} but not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         healthy = False
@@ -277,7 +277,7 @@ def health_check(params):
 
 def replace_entry_video(mentry, place_holder, bucket, doit):
     checker = CheckAndLog(mentry)
-    if (checker.hasOriginal()):
+    if (checker.hasOriginal() and checker.originalIsReady()):
         if (checker.aws_S3_file(bucket)):
             # delete derived flavors
             if (not mentry.deleteFlavors(doDelete=doit)):
@@ -300,11 +300,6 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                 mentry.log_action(logging.INFO, doit, 'Replaced', 'tag: {} ==> Place Holder Video at KMC'.format(PLACE_HOLDER_VIDEO))
                 return True
     return False;
-
-
-def check_entry_ready(mentry):
-    checker = CheckAndLog(mentry)
-    return checker.hasOriginal() and checker.originalIsReady()
 
 
 def check_config(params):
