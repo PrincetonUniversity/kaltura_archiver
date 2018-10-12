@@ -51,23 +51,23 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
-        KalturaArgParser._add_filter_parsm(subparser)
+        KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=list)
 
         subparser = subparsers.add_parser('archive', description="archive original flavors of matching videos to AWS-s3")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
-        KalturaArgParser._add_filter_parsm(subparser)
+        KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=archive_to_s3)
 
         subparser = subparsers.add_parser('restore', description="restore matching videos from AWS-s3")
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
-        KalturaArgParser._add_filter_parsm(subparser)
+        KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=restore_from_s3)
 
         subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
-        KalturaArgParser._add_filter_parsm(subparser)
+        KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=replace_videos)
 
         subparser = subparsers.add_parser('download', description="download original for given video ")
@@ -81,19 +81,23 @@ check status of entries, that is check each matching entry for the following:
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('status', description=description)
-        KalturaArgParser._add_filter_parsm(subparser)
+        KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=health_check)
 
         return parser
 
     @staticmethod
-    def _add_filter_parsm(subparser):
+    def _add_filter_params(subparser):
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
         subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
         subparser.add_argument("--played", "-p",  type=int, help="played within the the given number of years")
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
+        subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
+        subparser.add_argument("--page_size", "-s",  type=int, default=kaltura.Filter.PAGER_CHUNK,
+                               help="number of entries per page - default {}".format(kaltura.Filter.PAGER_CHUNK))
+        subparser.add_argument("--max_entries", "-M",  type=int, default=-1, help="maximum number of entries to work on  - default unlimited")
         return None
 
 
@@ -412,6 +416,7 @@ def _create_filter(params):
         filter.years_since_played(params['unplayed']).played_within_years(params['played'])
         if (params['noLastPlayed']) :
              filter.undefined_LAST_PLAYED_AT()
+        filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries'])
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 

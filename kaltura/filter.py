@@ -7,10 +7,27 @@ from KalturaClient.Plugins.Core import *
 import api
 
 class Filter:
+    PAGER_CHUNK = 500
+
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
         self.filter = KalturaMediaEntryFilter()
         self.filter.mediaTypeEqual = mediaType
         self.filter.orderBy = "+createdAt"  # Oldest first
+        self.page  = 1
+        self.per_page  = Filter.PAGER_CHUNK
+        self.maximum_iter  = -1
+
+    def first_page(self, page):
+        self.page = page
+        return self
+
+    def page_size(self, size):
+        self.per_page = size
+        return self
+
+    def max_iter(self, iter):
+        self.maximum_iter = iter
+        return self
 
     def entry_id(self, entryid):
         """
@@ -119,6 +136,7 @@ class Filter:
             api.logger.debug("Filter.{:s}: NOOP".format(mode))
         return self
 
+
     @staticmethod
     def _years_ago(years):
         """
@@ -138,7 +156,7 @@ class Filter:
         if (self.filter.advancedSearch != NotImplemented):
             avs = vars(self.filter.advancedSearch)
             properties.append(['advancedSearch', [[k, avs[k]] for k in avs.keys() if avs[k] != NotImplemented]])
-        return "Filter({})".format(properties)
+        return "Filter({}:(start=page-{}, chunks={}), max={}".format(properties, self.page, self.per_page, self.maximum_iter)
 
     def __repr__(self):
         return str(self)
@@ -150,17 +168,28 @@ class FilterIter:
     def __init__(self, filter):
         self.filter = filter
         self.pager = KalturaFilterPager()
-        self.pager.pageSize = FilterIter.PAGER_CHUNK
-        self.pager.pageIndex = 0
-        self.objects = iter([])
+        self.pager.pageSize = filter.per_page
+        self.pager.pageIndex = filter.page -1
+        self.max_iter = filter.maximum_iter
+        self.object_iter = iter([])
 
 
     def next(self):
+        if (self.max_iter  == 0):
+            raise StopIteration()
+
         try:
-            n = next(self.objects)
+            n = next(self.object_iter)
+            self.max_iter  -= 1
             return n;
         except StopIteration as stp:
             self.pager.setPageIndex(self.pager.getPageIndex() + 1)
-            self.objects = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
-            api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
-            return next(self.objects)
+            objects = api.getClient().media.list(self.filter.filter, self.pager).objects
+            if (objects):
+                api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
+                self.object_iter = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
+                self.max_iter  -= 1
+                return next(self.object_iter)
+            else:
+                #reached the end
+                raise StopIteration()
