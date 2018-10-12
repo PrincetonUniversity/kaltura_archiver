@@ -142,9 +142,11 @@ class CheckAndLog:
         self.mentry.log_action(log_level, True, "Check", '{}{}'.format(result, message))
 
 def matching_aws_s3_file(original, s3_file, bucket):
-    s3_file_size_kb = aws.s3_size(s3_file, bucket) / 1024
-    return abs(s3_file_size_kb - original.getSize()) <= 1
-
+    s3_size = aws.s3_size(s3_file, bucket)
+    o_size = original.getSize()
+    factor = (1.0 * s3_size) / o_size
+    print s3_size, o_size, "-", factor
+    return (1023 < factor) and (factor < 1027)
 
 def entry_health_check(mentry, bucket):
     original  = mentry.getOriginalFlavor()
