@@ -1,7 +1,6 @@
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import calendar
-import logging
 
 from KalturaClient.Plugins.Core import *
 
@@ -128,41 +127,25 @@ class Filter:
 
         """
         d = datetime.now() - relativedelta(years=years)
-        return calendar.timegm(d.utctimetuple())
+        return int(calendar.timegm(d.utctimetuple()))
 
     def __iter__(self):
         return FilterIter(self)
 
     def __str__(self):
-        s = "Filter("
-        if self.filter.idEqual != NotImplemented:
-            s = s + "idEqual=%s " % self.filter.idEqual
-
-        if self.filter.lastPlayedAtGreaterThanOrEqual != NotImplemented:
-            s = s + "lastPlayed >= {} ".format(api.dateString(self.filter.lastPlayedAtGreaterThanOrEqual))
-
-        if self.filter.lastPlayedAtLessThanOrEqual != NotImplemented:
-            s = s + "lastPlayed <= {} ".format(api.dateString(self.filter.lastPlayedAtLessThanOrEqual))
-
-        if hasattr(self.filter, 'categoryAncestorIdIn') and self.filter.categoryAncestorIdIn != NotImplemented:
-            s = s + "category={} ".format(self.filter.categoryAncestorIdIn)
-
-        adv = self.filter.advancedSearch
-        if  adv != NotImplemented:
-            if isinstance(adv, KalturaMediaEntryMatchAttributeCondition) and adv.attribute == KalturaMediaEntryMatchAttribute.TAGS:
-                    s = s + "tag: {}{}".format("!" if adv.not_ else "", adv.value)
-            elif isinstance(adv,KalturaMediaEntryCompareAttributeCondition)  and adv.attribute == KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT:
-                    s = s + "undefPlayedAt-last >= {}".format(api.dateString(adv.value))
-            else:
-                    s = s + "bad advancedSearch"
-        return s + ')'
+        vs = vars(self.filter)
+        properties = [[k, vs[k]] for k in vs.keys() if k != 'advancedSearch' and vs[k] != NotImplemented]
+        if (self.filter.advancedSearch != NotImplemented):
+            avs = vars(self.filter.advancedSearch)
+            properties.append(['advancedSearch', [[k, avs[k]] for k in avs.keys() if avs[k] != NotImplemented]])
+        return "Filter({})".format(properties)
 
     def __repr__(self):
         return str(self)
 
 
 class FilterIter:
-    PAGER_CHUNK = 200
+    PAGER_CHUNK = 500
 
     def __init__(self, filter):
         self.filter = filter
@@ -170,6 +153,7 @@ class FilterIter:
         self.pager.pageSize = FilterIter.PAGER_CHUNK
         self.pager.pageIndex = 0
         self.objects = iter([])
+
 
     def next(self):
         try:
@@ -180,4 +164,3 @@ class FilterIter:
             self.objects = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
             api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
             return next(self.objects)
-
