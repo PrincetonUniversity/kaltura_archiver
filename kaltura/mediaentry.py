@@ -132,7 +132,7 @@ class MediaEntry:
         """
         mediaEntry = KalturaMediaEntry()
         mediaEntry.tags = self.entry.tags + ", " + newtag
-        self.log_action(logging.INFO, doUpdate, 'Add Tag', "'{}' tags -> '{}'".format(newtag, mediaEntry.tags))
+        self.log_action(logging.INFO, doUpdate, 'Add Tag', newtag)
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
@@ -143,7 +143,7 @@ class MediaEntry:
         for t in remove_tags:
             tags.remove(t)
         mediaEntry.tags = ",".join(tags)
-        self.log_action(logging.INFO, doUpdate, 'Del Tags', "'{}' tags -> '{}'".format(','.join(tags), mediaEntry.tags))
+        self.log_action(logging.INFO, doUpdate, 'Del Tags', ','.join(remove_tags))
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
