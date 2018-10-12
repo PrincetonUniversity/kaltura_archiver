@@ -62,13 +62,16 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=replace_videos)
 
+        subparser = subparsers.add_parser('download', description="download original for given video ")
+        subparser.add_argument("--id", "-i",  required=True, help="kaltura media entry id")
+        subparser.set_defaults(func=download)
+
         description = """
 check status of entries, that is check each matching entry for the following: 
   +  has original flavor in READY status,
   +  the {} tag is set iff and only iff there is a corresponding entry in S3 
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
-
         subparser = subparsers.add_parser('status', description=description)
         KalturaArgParser._add_filter_parsm(subparser)
         subparser.set_defaults(func=health_check)
@@ -195,11 +198,33 @@ def archive_to_s3(params):
                     # store to S3
                     aws.s3_store(fname, bucket, entry.getId(), doit)
                     kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+                    checker.mentry.log_action(logging.INFO, doit, "Delete", fname)
+                    os.remove(fname)
                     done = True
         if (not done):
             nerror += 1
 
     return nerror
+
+
+def download(params):
+    """
+    save original flavors to aws  for  matching kaltura records
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    doit = setup(params, None)
+    filter = _create_filter(params)
+    entry =   next(iter(filter))
+
+    checker = CheckAndLog(kaltura.MediaEntry(entry))
+    if (checker.hasOriginal() and checker.originalIsReady()):
+        fname = checker.mentry.downloadOriginal(doit)
+        print("downloded to " + fname)
+        return 0
+    else:
+        return 1
 
 def replace_videos(params):
     """
@@ -322,10 +347,15 @@ def list(params):
 
 def _create_filter(params):
     filter = kaltura.Filter()
-    filter.entry_id(params['id']).tag(params['tag']).category(params['category'])
-    filter.years_since_played(params['unplayed']).played_within_years(params['played'])
-    if (params['noLastPlayed']) :
-        filter.undefined_LAST_PLAYED_AT();
+    filter.entry_id(params['id'])
+    if 'tag' in params:
+        # implies all the other tags are there too
+        # see ArgParser
+        filter.tag(params['tag'])
+        filter.category(params['category'])
+        filter.years_since_played(params['unplayed']).played_within_years(params['played'])
+        if (params['noLastPlayed']) :
+             filter.undefined_LAST_PLAYED_AT();
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
