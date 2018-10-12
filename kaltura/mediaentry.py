@@ -57,12 +57,13 @@ class MediaEntry:
 
         if not doit - just log actions - but do not perform
 
-        :param if False only log action take
+        :param doit: if False only log activity
         :return: upon success return the tenp file name  - otherwise return None
+        :raises RuntimeError if the download fails for unexpected reason
         """
         original = self.getOriginalFlavor()
         if (original):
-            to_file = tempfile.mkstemp()[1]
+            to_file = tempfile.mkstemp("-" + self.entry.getId(), prefix="")[1]
             download_url = api.getClient().flavorAsset.getUrl(original.getId())
             self.log_action(logging.INFO,doit, "Download", "Flavor({}) to {}".format(Flavor(original), to_file))
             if doit:
@@ -71,6 +72,7 @@ class MediaEntry:
                     return to_file
                 except Exception as e:
                     self.log_action(logging.ERROR,doit, "Failed Download", "Original {} - {}".format(original, e))
+                    raise RuntimeError(e)
             else:
                 # dryRun always succeeds
                 return to_file
