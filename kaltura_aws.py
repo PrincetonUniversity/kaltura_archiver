@@ -56,6 +56,7 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('archive', description="archive original flavors of matching videos to AWS-s3")
         subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=archive_to_s3)
 
@@ -72,6 +73,7 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('download', description="download original for given video ")
         subparser.add_argument("--id", "-i",  required=True, help="kaltura media entry id")
+        subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         subparser.set_defaults(func=download)
 
         description = """
@@ -196,6 +198,7 @@ def archive_to_s3(params):
     doit = setup(params, 'archive')
     filter = _create_filter(params)
     bucket = params['awsBucket']
+    tmp = params['tmp']
     nerror = 0
     for entry in filter:
         done = False
@@ -208,13 +211,14 @@ def archive_to_s3(params):
                 done = True
             else:
                 # download from kaltura
-                fname = checker.mentry.downloadOriginal(doit)
+                fname = checker.mentry.downloadOriginal(tmp, doit)
                 if (fname):
                     # store to S3
                     aws.s3_store(fname, bucket, entry.getId(), doit)
                     kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
                     checker.mentry.log_action(logging.INFO, doit, "Delete", fname)
-                    os.remove(fname)
+                    if (doit):
+                        os.remove(fname)
                     done = True
         if (not done):
             nerror += 1
@@ -246,12 +250,13 @@ def download(params):
     :return:  None
     """
     doit = setup(params, None)
+    tmp = params['tmp']
     filter = _create_filter(params)
     entry =   next(iter(filter))
 
     checker = CheckAndLog(kaltura.MediaEntry(entry))
     if (checker.hasOriginal() and checker.originalIsReady()):
-        fname = checker.mentry.downloadOriginal(doit)
+        fname = checker.mentry.downloadOriginal(tmp, doit)
         print("downloded to " + fname)
         return 0
     else:

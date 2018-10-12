@@ -51,19 +51,22 @@ class MediaEntry:
                 return f
         return None
 
-    def downloadOriginal(self, doit=False):
+    def downloadOriginal(self, tmp, doit=False):
         """
-        generate a temporary file name and download the original flavor file
+        download original flavor to file in tmp directory
+
+        use the entry id as file name
 
         if not doit - just log actions - but do not perform
 
         :param doit: if False only log activity
+        :param tmp:  directory path
         :return: upon success return the tenp file name  - otherwise return None
         :raises RuntimeError if the download fails for unexpected reason
         """
         original = self.getOriginalFlavor()
         if (original):
-            to_file = tempfile.mkstemp("-" + self.entry.getId(), prefix="")[1]
+            to_file = "{}/{}.mp4".format(tmp, self.entry.getId())
             download_url = api.getClient().flavorAsset.getUrl(original.getId())
             self.log_action(logging.INFO,doit, "Download", "Flavor({}) to {}".format(Flavor(original), to_file))
             if doit:
