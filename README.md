@@ -23,13 +23,57 @@ The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based
  2. whether video has no lastPlayedAt property 
  3. category id 
  3. tag value 
+ 4. entry id 
 
 Critera can be combined, except for selecting by tag and selecting by 'no lastPlayedAt'.
 
-All actions that trigger changes, lieke archiving videos in s3 or replacing with the place holder video are 
+All actions that trigger changes, like archiving videos in s3 or replacing with the place holder video are 
 perfomed in dryRun mode by default. 
 
-### kaltura_aws subcommands 
+Videos entries can be in three states: 
+  1. initial
+  2. archived 
+  3. place_holder
+  
+In the initial state: 
+  1. s3 does not contain a copy of the entry's original flavor 
+  2. entry does not have the 'archived_to_s3' tag 
+  3. entry does not have the 'deleted_flavors' tag 
+  4. its original flavor is the entrys 'real' video - lets call this the real original flavor
+
+In the archived state: 
+  1. s3 contain a copy of the entry's real original flavor 
+  2. entry has  the 'archived_to_s3' tag 
+  3. entry does not have the 'deleted_flavors' tag 
+  4. its original flavor is the real original flavor
+
+
+In the  place_holder state: 
+  1. s3 contain a copy of the entry's real original flavor 
+  2. entry has  the 'archived_to_s3' tag 
+  3. entry has the 'deleted_flavors' tag 
+  4. its original flavor is the place holder video 
+  
+
+The kaltura_aws.py subcommands moves entries between states: 
+
+~~~
+    initial state -------- archive cmd  ------> archive state
+    archive state -------- archive cmd  ------> archive state
+    
+    archive state -------- place_holder cmd --> place_holder state 
+    place_holder state --- place_holder cmd --> place_holder state 
+    
+    place_holder state --- restore cmd -------> archived state 
+~~~    
+
+Subcommands print errors if they are applied to entries in a state that they can not work with, 
+for example the place_holder command refuses to work with entries in the initial state. 
+
+In addition kaltura_aws.py has a status subcommand. 
+
+
+### kaltura_aws subcommands in pseudo code
 
 
 #### archive 
@@ -72,6 +116,7 @@ if the entry does not have the 'flavors_deleted' tag
     then the filesize of the AWS s3 entry matches the ORIGINAL flavors file size
 ~~~
 
+
 ## How to use 
 
 to archive and replace with the place holder video choose a filter option 
@@ -96,8 +141,20 @@ Apply the following steps to videos with the tag "archived_to_s3" that have been
  1. Request restoral from AWS Glacier   IF not yet available in S3; This request will take 5 - 12 hours to complete.
  1. Restore Video:
    1. replace placeholder video with original video  IF video is availabe in S3
-   1. recreate flavors and remove   tag: "flavors_deleted"
-   
+   1. recreate flavors and remove   tag: "flavors_deleted"    
+
+
+
+### Edge case 
+
+It is rare that videos are edited. Very few users have this ability. The procedure above will result in errors if
+
+  1. a video is archived 
+  1. a user replaces the original flavor with a new version  after archival 
+
+The kaltura_aws.py command will error out when asked to replace the video unless the file size of the initial video and the versioned video are the same. 
+So only if a video is replaced after archival which is unlikely since few users have that ability 
+and if the versioned video has the same size, which is even more unlikely, will the procedure loose the versioned video. 
 
 
 ### See Early Requirements  
