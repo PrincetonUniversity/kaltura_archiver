@@ -110,31 +110,31 @@ class CheckAndLog:
         self.mentry = mentry
         self.entry = self.mentry.entry
 
-    def hasOriginal(self):
+    def has_original(self):
         self.original = self.mentry.getOriginalFlavor()
         yes = self.original != None
         self._log_action(yes, 'Entry has Original')
         return yes
 
-    def originalIsReady(self):
+    def original_ready(self):
         yes = kaltura.Flavor(self.original).isReady()
         message = 'Original Flavor {} status == READY'.format(self.original.getId())
         self._log_action(yes, message)
         return yes
 
-    def originalBelowSizeLimit(self):
+    def original_below_size_limit(self):
         small_enough = self.original.getSize() <= CheckAndLog.SIZE_LIMIT_KB
         message = 'Original Flavor {} smaller than {}'.format(self.original.getId(), CheckAndLog.SIZE_LIMIT_KB)
         self._log_action(small_enough, message);
         return small_enough
 
-    def doesNotHaveTag(self, tag):
+    def no_such_tag(self, tag):
         yes = not (tag in self.mentry.entry.getTags())
         message = 'Entry does not have tag {}'.format(tag)
         self._log_action(yes, message)
         return yes
 
-    def hasTag(self, tag):
+    def has_tag(self, tag):
         yes = tag in self.entry.getTags()
         message = 'Entry has tag {}'.format(tag)
         self._log_action(yes, message)
@@ -212,7 +212,7 @@ def copy_to_s3(params):
         s3_file = entry.getId()
 
         checker = CheckAndLog(kaltura.MediaEntry(entry))
-        if (checker.hasOriginal() and checker.originalBelowSizeLimit() and checker.originalIsReady()):
+        if (checker.has_original() and checker.original_below_size_limit() and checker.original_ready()):
             if (aws.s3_exists(s3_file, bucket)):
                 checker.mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
                 done = True
@@ -262,7 +262,7 @@ def download(params):
     entry =   next(iter(filter))
 
     checker = CheckAndLog(kaltura.MediaEntry(entry))
-    if (checker.hasOriginal() and checker.originalIsReady()):
+    if (checker.has_original() and checker.original_ready()):
         fname = checker.mentry.downloadOriginal(tmp, doit)
         print("downloded to " + fname)
         return 0
@@ -320,7 +320,7 @@ def health_check(params):
 
 def replace_entry_video(mentry, place_holder, bucket, doit):
     checker = CheckAndLog(mentry)
-    if (checker.hasOriginal() and checker.originalIsReady()):
+    if (checker.has_original() and checker.original_ready()):
         if (checker.aws_S3_file(bucket)):
             # delete derived flavors
             if (not mentry.deleteFlavors(doDelete=doit)):
@@ -339,7 +339,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
             # so check on relevant tag
             # reset kaltura connection
             kaltura.api.getClient(True)
-            if checker.hasTag(PLACE_HOLDER_VIDEO):
+            if checker.has_tag(PLACE_HOLDER_VIDEO):
                 mentry.log_action(logging.INFO, doit, 'Replaced', 'tag: {} ==> Place Holder Video at KMC'.format(PLACE_HOLDER_VIDEO))
                 return True
     return False;
@@ -348,13 +348,13 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
 def restore_entry_from_s3(mentry, bucket, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
-    if not (checker.hasOriginal() and checker.originalIsReady()):
+    if not (checker.has_original() and checker.original_ready()):
         return False
 
     if (not aws.s3_exists(s3_file, bucket)):
         checker.mentry.log_action(logging.ERROR, doit, "Restore", 'Could not find  s3://{}/{}'.format(bucket, s3_file))
         return False
-    if (not checker.hasTag(PLACE_HOLDER_VIDEO)):
+    if (not checker.has_tag(PLACE_HOLDER_VIDEO)):
         checker.mentry.log_action(logging.INFO, doit, "Restore", 'Original Flavor is original video')
         return False
 
@@ -379,7 +379,7 @@ def restore_entry_from_s3(mentry, bucket, doit):
 
 def check_entry_ready(mentry):
     checker = CheckAndLog(mentry)
-    return checker.hasOriginal() and checker.originalIsReady()
+    return checker.has_original() and checker.original_ready()
 
 
 def check_config(params):
