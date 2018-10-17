@@ -25,7 +25,7 @@ class KalturaArgParser(envvars.ArgumentParser):
                         'awsBucket' : 'AWS_BUCKET|AWS s3 bucket for video storage|',
                         'videoPlaceholder' : 'PLACEHOLDER_VIDEO|placeholder video|placeholder_video.mp4'}
 
-    DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, archive and restore videos to and from AWS storage.
+    DESCRIPTION = """This script interacts with a Kaltura KMC and AWS to list, copy to s3 and restore videos to and from AWS storage.
     
 All actions are performed in DRYRUN mode by default, meaning they are logged but not performed. 
 In addition to logging to the terminal actions are logged ./kaltura.log or kaltura-dryrun.log. 
@@ -54,11 +54,11 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=list)
 
-        subparser = subparsers.add_parser('archive', description="archive original flavors of matching videos to AWS-s3")
-        subparser.add_argument("--archive", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        subparser = subparsers.add_parser('copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
+        subparser.add_argument("--copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
-        subparser.set_defaults(func=archive_to_s3)
+        subparser.set_defaults(func=copy_to_s3)
 
         subparser = subparsers.add_parser('restore', description="restore matching videos from AWS-s3")
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
@@ -104,6 +104,8 @@ check status of entries, that is check each matching entry for the following:
 
 
 class CheckAndLog:
+    SIZE_LIMIT_KB = 10000000
+
     def __init__(self, mentry):
         self.mentry = mentry
         self.entry = self.mentry.entry
@@ -119,6 +121,12 @@ class CheckAndLog:
         message = 'Original Flavor {} status == READY'.format(self.original.getId())
         self._log_action(yes, message)
         return yes
+
+    def originalBelowSizeLimit(self):
+        small_enough = self.original.getSize() <= CheckAndLog.SIZE_LIMIT_KB
+        message = 'Original Flavor {} smaller than {}'.format(self.original.getId(), CheckAndLog.SIZE_LIMIT_KB)
+        self._log_action(small_enough, message);
+        return small_enough
 
     def doesNotHaveTag(self, tag):
         yes = not (tag in self.mentry.entry.getTags())
@@ -187,14 +195,14 @@ def entry_health_check(mentry, bucket):
     return  healthy, explanation
 
 
-def archive_to_s3(params):
+def copy_to_s3(params):
     """
     save original flavors to aws  for  matching kaltura records
 
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    doit = setup(params, 'archive')
+    doit = setup(params, 'copy')
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
@@ -204,7 +212,7 @@ def archive_to_s3(params):
         s3_file = entry.getId()
 
         checker = CheckAndLog(kaltura.MediaEntry(entry))
-        if (checker.hasOriginal() and checker.originalIsReady()):
+        if (checker.hasOriginal() and checker.originalBelowSizeLimit() and checker.originalIsReady()):
             if (aws.s3_exists(s3_file, bucket)):
                 checker.mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
                 done = True

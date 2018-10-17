@@ -16,6 +16,8 @@ python kaltura_aws.py --help
 ## Archiving Videos Workflow 
 
 Only videos that have not been played recently are archived. 
+Only videos amller than  10000000kb are archived
+ 
 
 The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
 
@@ -58,8 +60,8 @@ In the  place_holder state:
 The kaltura_aws.py subcommands moves entries between states: 
 
 ~~~
-    initial state -------- archive cmd  ------> archive state
-    archive state -------- archive cmd  ------> archive state
+    initial state -------- copy cmd  ------> archive state
+    archive state -------- copy cmd  ------> archive state
     
     archive state -------- place_holder cmd --> place_holder state 
     place_holder state --- place_holder cmd --> place_holder state 
