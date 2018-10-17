@@ -2,6 +2,7 @@ import api
 import logging
 import tempfile
 import urllib
+import os
 
 from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource, KalturaFlavorAssetStatus
 
@@ -75,7 +76,9 @@ class MediaEntry:
                     return to_file
                 except Exception as e:
                     self.log_action(logging.ERROR,doit, "Failed Download", "Original {} - {}".format(original, e))
-                    raise RuntimeError(e)
+                    self.log_action(logging.ERROR,doit, "Delete", to_file) 
+                    os.remove(to_file) 
+                    return None
             else:
                 # dryRun always succeeds
                 return to_file
