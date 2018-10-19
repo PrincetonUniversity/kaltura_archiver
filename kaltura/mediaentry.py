@@ -140,13 +140,12 @@ class MediaEntry:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
 
-    def delTags(self, remove_tags, doUpdate=False):
+    def delTag(self, remove_tag, doUpdate=False):
         mediaEntry = KalturaMediaEntry()
-        tags = self.entry.tags.split(',')
-        for t in remove_tags:
-            tags.remove(t)
+        tags = self.entry.tags.split(', ')
+        tags.remove(remove_tag)
         mediaEntry.tags = ",".join(tags)
-        self.log_action(logging.INFO, doUpdate, 'Del Tags', ','.join(remove_tags))
+        self.log_action(logging.INFO, doUpdate, 'Del Tag', remove_tag)
         if doUpdate:
             api.getClient().media.update(self.entry.getId(), mediaEntry)
         return None
