@@ -129,7 +129,7 @@ class CheckAndLog:
         return small_enough
 
     def no_such_tag(self, tag):
-        yes = not (tag in self.mentry.entry.getTags())
+        yes = not (tag in self.entry.getTags())
         message = 'Entry does not have tag {}'.format(tag)
         self._log_action(yes, message)
         return yes
@@ -140,9 +140,24 @@ class CheckAndLog:
         self._log_action(yes, message)
         return yes
 
-    def aws_S3_file(self, bucket):
-        yes = matching_aws_s3_file(self.original, self.entry.getId(), bucket)
-        message = 'Size-Mismatch (s3://{}/{}) Orginal Flavor Size'.format(bucket, self.mentry.entry.getId())
+    def _s3_size(self, bucket):
+        if not hasattr(self, 's3_size'):
+            self.s3_size = aws.s3_size(self.entry.getId(), bucket)
+        return self.s3_size
+
+    def aws_s3_matching_file(self, bucket):
+        if (aws.s3_exists(self.entry.getId(), bucket)):
+            yes = aws_compatible_size(self.original.getSize(), self._s3_size(bucket))
+            message = 'Size-Match (s3://{}/{}) = {}  - Original Flavor Size - {} kb'.format(bucket, self.entry.getId(), self._s3_size(bucket), self.original.getSize())
+        else:
+            message = 'Exists (s3://{}/{})'.format(bucket, self.entry.getId())
+            yes = False
+        self._log_action(yes, message)
+        return yes
+
+    def aws_s3_below_size_limit(self, bucket):
+        yes = self._s3_size(bucket)  <= (CheckAndLog.SIZE_LIMIT_KB * 1024)
+        message = 's3://{}/{}) <= {}'.format(bucket, self.entry.getId(), CheckAndLog.SIZE_LIMIT_KB)
         self._log_action(yes, message)
         return yes
 
@@ -186,7 +201,7 @@ def entry_health_check(mentry, bucket):
         healthy = False
 
     # if it is saved but  not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
-    if healthy and  not replaced_tag and saved_tag and not matching_aws_s3_file(original, mentry.entry.getId(), bucket):
+    if healthy and  not replaced_tag and saved_tag and not aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket)):
         explanation= 'ERROR: is {} but not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         healthy = False
 
@@ -212,21 +227,24 @@ def copy_to_s3(params):
         s3_file = entry.getId()
 
         checker = CheckAndLog(kaltura.MediaEntry(entry))
-        if (checker.has_original() and checker.original_below_size_limit() and checker.original_ready()):
+        if (checker.has_original() and checker.original_ready()):
             if (aws.s3_exists(s3_file, bucket)):
                 checker.mentry.log_action(logging.INFO, doit, "Archived", 's3://{}/{}'.format(bucket, s3_file))
-                done = True
             else:
-                # download from kaltura
-                fname = checker.mentry.downloadOriginal(tmp, doit)
-                if (fname):
-                    # store to S3
-                    aws.s3_store(fname, bucket, entry.getId(), doit)
-                    kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
-                    checker.mentry.log_action(logging.INFO, doit, "Delete", fname)
-                    if (doit):
-                        os.remove(fname)
-                    done = True
+                if checker.original_below_size_limit():
+                    # download from kaltura
+                    fname = checker.mentry.downloadOriginal(tmp, doit)
+                    if (fname):
+                        # store to S3
+                        aws.s3_store(fname, bucket, entry.getId(), doit)
+                        kaltura.MediaEntry(entry).addTag(SAVED_TO_S3, doit)
+                        checker.mentry.log_action(logging.INFO, doit, "Delete", fname)
+                        if (doit):
+                            os.remove(fname)
+                else:
+                    checker.mentry.log_action(logging.INFO, doit, "Skip Copy", "original flavor exceeds size limit {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
+            done = True
+
         if (not done):
             nerror += 1
 
@@ -318,63 +336,66 @@ def health_check(params):
             nerror +=1
     return nerror
 
+
 def replace_entry_video(mentry, place_holder, bucket, doit):
     checker = CheckAndLog(mentry)
+    failure = True
     if (checker.has_original() and checker.original_ready()):
-        if (checker.aws_S3_file(bucket)):
-            # delete derived flavors
-            if (not mentry.deleteFlavors(doDelete=doit)):
-                return False
-
-            # replace with place_holder video
-            if (not mentry.replaceOriginal(place_holder, doit)):
-                return False
-
-            # indicate successful replace
-            mentry.addTag(PLACE_HOLDER_VIDEO, doit)
-            return True
+        if (checker.aws_s3_matching_file(bucket)):
+            # s3 file in bucket that matches in size
+            if checker.aws_s3_below_size_limit(bucket):
+                # delete derived flavors
+                # then replace with place_holder video
+                if mentry.deleteFlavors(doDelete=doit):
+                    if mentry.replaceOriginal(place_holder, doit):
+                        # indicate successful replace
+                        mentry.addTag(PLACE_HOLDER_VIDEO, doit)
+                        mentry.log_action(logging.ERROR, doit, 'Replace', 'Complete');
+                        failure = False
+            else:
+                # s3 file in bucket but exceed size limit
+                mentry.log_action(logging.WARN, doit, 'Skip Replace', 'Big s3 file - can\'t be restored')
+                failure = False
         else:
             # original flavor size does not match s3 file size
-            # fine if this has been processed before
-            # so check on relevant tag
-            # reset kaltura connection
+            # fine if this has been replaced before
+            # so check on relevant tag  (reset kaltura connection to get the updated value)
             kaltura.api.getClient(True)
-            if checker.has_tag(PLACE_HOLDER_VIDEO):
-                mentry.log_action(logging.INFO, doit, 'Replaced', 'tag: {} ==> Place Holder Video at KMC'.format(PLACE_HOLDER_VIDEO))
-                return True
-    return False;
+            if checker.has_tag(PLACE_HOLDER_VIDEO) and checker.has_tag(SAVED_TO_S3):
+                mentry.log_action(logging.INFO, doit, 'Replaced Earlier',
+                                  'According to {} and {} tags at KMC'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3))
+                failure = False
+    if (failure):
+        mentry.log_action(logging.ERROR, doit, 'Replace Failed', '');
+    return not failure;
 
 
 def restore_entry_from_s3(mentry, bucket, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
-    if not (checker.has_original() and checker.original_ready()):
-        return False
+    failure = True;
 
-    if (not aws.s3_exists(s3_file, bucket)):
-        checker.mentry.log_action(logging.ERROR, doit, "Restore", 'Could not find  s3://{}/{}'.format(bucket, s3_file))
-        return False
-    if (not checker.has_tag(PLACE_HOLDER_VIDEO)):
-        checker.mentry.log_action(logging.INFO, doit, "Restore", 'Original Flavor is original video')
-        return False
+    if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
+        # see whether we can get the S3 file - might still be in glacier
+        if aws.s3_restore(s3_file, bucket, doit):
+            # download from S3
+            to_file = tempfile.mkstemp()[1]
+            aws.s3_download(to_file, bucket, s3_file, doit)
 
-    # see whether we can get the S3 file - might still be in glacier
-    if (aws.s3_restore(mentry.entry.getId()), bucket, doit):
-        # download from S3
-        to_file = tempfile.mkstemp()[1]
-        aws.s3_download(to_file, bucket, mentry.entry.getId(), doit)
+            # delete all flavors
+            if mentry.deleteFlavors(doDelete=doit):
+              # replace with original from s3
+                if (mentry.replaceOriginal(to_file, doit)):
+                    # indicate that this is not this is not the place_holder (but original) video
+                    mentry.delTag(PLACE_HOLDER_VIDEO)
+                    failure = False
+        else:
+            mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
+            failure = False
 
-        # delete all flavors
-        if (not mentry.deleteFlavors(doDelete=doit)):
-            return False
-        # replace with original from s3
-        if (not mentry.replaceOriginal(to_file, doit)):
-            return False
-        # indicate that this is not this is not the place_holder (but original) video
-        mentry.delTags([PLACE_HOLDER_VIDEO])
-
-    # either succesfull restore - or have to try again when video is back from glacier
-    return True
+    if (failure):
+        mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
+    return not failure
 
 
 def check_entry_ready(mentry):
@@ -400,7 +421,7 @@ def list(params):
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.VIEWS,
                    kaltura.ENTRY_ID, kaltura.TOTAL_SIZE, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
-                   kaltura.CATEGORIES_IDS, kaltura.CATEGORIES, kaltura.NAME]
+                   kaltura.CATEGORIES_IDS, kaltura.CATEGORIES, kaltura.TAGS, kaltura.NAME]
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
