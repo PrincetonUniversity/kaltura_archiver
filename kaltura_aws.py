@@ -215,7 +215,10 @@ def entry_health_check(mentry, bucket):
         explanation= 'ERROR: is {} but not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         healthy = False
 
-    if (healthy):
+    if (healthy and s3Exists and original.getSize() > CheckAndLog.SIZE_LIMIT_KB):
+        explanation= 'WARNING: in bucket {} but original beyond size limit {}'.format(bucket, CheckAndLog.SIZE_LIMIT_KB)
+
+    if (healthy and not explanation):
         explanation= 'HEALTHY'
     return  healthy, explanation
 
