@@ -62,7 +62,7 @@ def s3_restore(filename, bucketname, doit=False):
 
         if obj.storage_class == 'GLACIER':
             if str(obj.restore).startswith('ongoing-request="false"'):
-                api.log_action(logging.INFO, "AWS-S3", "{}/{}".format(bucketname, filename), "Request Restore", "storage-class={}".format(obj.storage_class))
+                api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Request Restore", "storage-class={}".format(obj.storage_class))
                 if doit:
                     bucket = _s3.Bucket(bucketname)
                     bucket.meta.client.restore_object(
@@ -72,14 +72,14 @@ def s3_restore(filename, bucketname, doit=False):
                                         'GlacierJobParameters': {'Tier': 'Bulk'}}
                     )
             else:
-                api.log_action("AWS-S3", "{}/{}".format(bucketname, filename), "Restoring", "obj.restore={}".format(obj.restore))
+                api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Restoring", "obj.restore={}".format(obj.restore))
         elif (obj.storage_class == None):
-            api.log_action(logging.INFO, "AWS-S3", "{}/{}".format(bucketname, filename), "Available", "")
+            api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Available", "")
             return True
         else:
-            api.log_action(logging.ERROR, "AWS-S3", "{}/{}".format(bucketname, filename), "Unknown class", "obj.restore={}".format(obj.restore))
+            api.log_action(logging.ERROR, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Unknown class", "obj.restore={}".format(obj.restore))
     except botocore.exceptions.ClientError as e:
-        api.log_action(logging.ERROR, "AWS-S3", "{}/{}".format(bucketname, filename), "Access Error", e)
+        api.log_action(logging.ERROR, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Access Error", e)
 
     return False
 
