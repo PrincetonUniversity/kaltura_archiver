@@ -188,8 +188,7 @@ class FilterIter:
             if (objects):
                 api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
                 self.object_iter = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
-                self.max_iter  -= 1
-                return next(self.object_iter)
+                return self.next()
             else:
                 #reached the end
                 raise StopIteration()
