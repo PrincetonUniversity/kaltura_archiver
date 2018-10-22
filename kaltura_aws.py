@@ -502,13 +502,8 @@ def setup(params, doit_prop):
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
     return doit
 
-def _get_env_vars():
-    env = envvars.to_value(KalturaArgParser.ENV_VARS)
-    return env
-
-
 def _main(args):
-    params = _get_env_vars()
+    params = envvars.to_value(KalturaArgParser.ENV_VARS)
     params.update(args)
     return params['func'](params)
 
