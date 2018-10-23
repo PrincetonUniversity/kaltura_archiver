@@ -54,8 +54,8 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=list)
 
-        subparser = subparsers.add_parser('copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
-        subparser.add_argument("--copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
+        subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
+        subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=copy_to_s3)
@@ -210,9 +210,15 @@ def entry_health_check(mentry, bucket):
         explanation= 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
 
-    # if it is saved but  not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
-    if healthy and  not replaced_tag and saved_tag and not aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket)):
-        explanation= 'ERROR: is {} but not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
+    compatible_size = aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket))
+    # if it is saved and not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
+    if healthy and saved_tag and not replaced_tag and not compatible_size:
+        explanation = 'ERROR: is {} and not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
+        healthy = False
+
+    # if it is saved and sizes match then there should not be a replaced_tag
+    if healthy  and saved_tag and compatible_size and replaced_tag:
+        explanation = 'ERROR: is {} and  {} - but size match of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         healthy = False
 
     if (healthy and s3Exists and original.getSize() > CheckAndLog.SIZE_LIMIT_KB):
@@ -230,7 +236,7 @@ def copy_to_s3(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    doit = setup(params, 'copy')
+    doit = setup(params, 's3copy')
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
