@@ -9,8 +9,13 @@ from KalturaClient.Plugins.Core import *
 
 from datetime import datetime
 
+class KalturaLogger(IKalturaLogger):
+    def log(self, msg):
+        logger.debug("API: " + msg)
+
 __client__ = None
 __params__ = {
+    'url': "https://www.kaltura.com/",
     'secret' : None,
     'user_id' : None,
     'partner_id' : None,
@@ -22,7 +27,14 @@ __params__ = {
 def getClient(reload=False):
     global __client__, __params__
     if (reload):
-        _start_session(__client__, __params__)
+        config = KalturaConfiguration(__params__['partner_id'], logger=KalturaLogger())
+        config.serviceUrl = __params__['url']
+        client = KalturaClient(config)
+        logger.info("KALTURA SESSION %s with %s partnerId:%s" % (client.getConfig().serviceUrl, __params__['user_id'], __params__['partner_id']))
+        ks = client.session.start(__params__['secret'], __params__['user_id'], __params__['ktype'],
+                              __params__['partner_id'], __params__['expiry'], __params__['privileges'])
+        client.setKs(ks)
+        __client__ = client
     return __client__;
 
 
@@ -30,23 +42,12 @@ def startSession(partner_id, user_id, secret):
     """ Use configuration to generate KS
     """
     global __client__, __params__
-    config = KalturaConfiguration(partner_id)
-    config.serviceUrl = "https://www.kaltura.com/"
-    client = KalturaClient(config)
-
     __params__['partner_id'] = partner_id
     __params__['user_id'] = user_id
     __params__['secret'] = secret
-
-    _start_session(client, __params__)
-    __client__ = client
+    c = getClient(reload=True)
     return None
 
-def _start_session(client, params):
-    logger.info("KALTURA SESSION %s with %s partnerId:%s" % (client.getConfig().serviceUrl, params['user_id'], params['partner_id']))
-    ks = client.session.start(params['secret'], params['user_id'], params['ktype'],
-                              params['partner_id'], params['expiry'], params['privileges'])
-    client.setKs(ks)
 
 def dateString(at):
     """

@@ -41,7 +41,7 @@ It  uses the following environment variables
         for k in evars:
             description = description + "\n\t%-15s:  %s" % (k, evars[k])
 
-        loglevels = ['CRITICAL', 'ERROR', 'WARN', 'INFO', 'DEBUG', 'NOTSET']
+        loglevels = ['ERROR', 'WARN', 'INFO', 'DEBUG']
         parser = KalturaArgParser(description=description, formatter_class=RawDescriptionHelpFormatter)
         parser.add_argument("--loglevel", "-l", choices=loglevels,  default=logging.INFO, help="log level  - default: INFO")
 
