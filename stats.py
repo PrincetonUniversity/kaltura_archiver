@@ -2,6 +2,7 @@ from  kaltura_aws import KalturaArgParser, SAVED_TO_S3, PLACE_HOLDER_VIDEO
 import kaltura
 import envvars
 import traceback
+import sys
 
 def setUp():
         params = envvars.to_value(KalturaArgParser.ENV_VARS)
@@ -13,7 +14,7 @@ def print_summary(n, n_saved, n_pholder):
         print("#{} {}".format(PLACE_HOLDER_VIDEO, n_pholder))
 
 def count():
-        filter = kaltura.Filter()
+        filter = kaltura.Filter().undefined_LAST_PLAYED_AT()
         n, n_saved, n_pholder = 0, 0, 0
         try:
                 for e in filter:
@@ -22,12 +23,13 @@ def count():
                                 n_saved += 1
                         if (PLACE_HOLDER_VIDEO in e.getTags()):
                                 n_pholder += 1
-                        if (0 == n % 500):
-                                print_summary(n, n_saved, n_pholder)
+                        if (0 == n % 250):
+                                sys.stdout.write('.'); sys.stdout.flush()
         except Exception as e:
                 print(str(e))
                 traceback.print_exc()
-        print("---")
+        print("\n")
+        print("--- undefined_LAST_PLAYED_AT")
         print_summary(n, n_saved, n_pholder)
 
 
