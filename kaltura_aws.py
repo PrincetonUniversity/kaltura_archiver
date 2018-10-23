@@ -62,6 +62,7 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('restore', description="restore matching videos from AWS-s3")
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
+        subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=restore_from_s3)
 
@@ -279,9 +280,10 @@ def restore_from_s3(params):
     doit = setup(params, 'restore')
     filter = _create_filter(params)
     bucket = params['awsBucket']
+    tmp = params['tmp']
     nerror = 0
     for entry in filter:
-        if (not restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, doit)):
+        if (not restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, tmp, doit)):
             nerror += 1
     return nerror;
 
@@ -389,29 +391,31 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
     return not failure;
 
 
-def restore_entry_from_s3(mentry, bucket, doit):
+def restore_entry_from_s3(mentry, bucket, tmp, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
     failure = True;
+    to_file = None
 
     if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
         # see whether we can get the S3 file - might still be in glacier
         if aws.s3_restore(s3_file, bucket, doit):
             # download from S3
-            to_file = tempfile.mkstemp()[1]
-            aws.s3_download(to_file, bucket, s3_file, doit)
+            to_file = aws.s3_download( "{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
 
             # delete all flavors
             if mentry.deleteFlavors(doDelete=doit):
               # replace with original from s3
                 if (mentry.replaceOriginal(to_file, doit)):
-                    # indicate that this is not this is not the place_holder (but original) video
+                    # indicate that this is not the place_holder (but original) video
                     mentry.delTag(PLACE_HOLDER_VIDEO)
                     failure = False
         else:
             mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
             failure = False
 
+    if (to_file):
+        os.remove(to_file)
     if (failure):
         mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
     return not failure

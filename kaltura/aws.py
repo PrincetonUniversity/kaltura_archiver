@@ -41,6 +41,7 @@ def s3_store(src_file, bucketname, bucketfile, doit=False):
 def s3_download(to_file, bucketname, bucketfile, doit=False):
     _s3.meta.client.download_file(bucketname, bucketfile, to_file)
     api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Download", "to s3://{}/{} to {}".format(bucketname,  bucketfile, to_file))
+    return to_file
 
 
 def s3_restore(filename, bucketname, doit=False):
