@@ -34,6 +34,10 @@ class MediaEntry:
             raise RuntimeError("Can't create MediaEntry with {} instance".format(entry))
         self.entry = entry
 
+    def reload(self):
+        self.entry = api.getClient().media.get(self.entry.getId())
+        return self.entry
+
     def getTotalSize(self):
         size = 0
         for f in FlavorAssetIterator(self.entry):
@@ -135,13 +139,10 @@ class MediaEntry:
         :return: None
         """
         mediaEntry = KalturaMediaEntry()
-        mediaEntry.tags = self.entry.tags + ", " + newtag
+        mediaEntry.tags = self.entry.getTags() + ", " + newtag
         self.log_action(logging.INFO, doUpdate, 'Add Tag', newtag)
         if doUpdate:
-            print(vars(api.getClient().media))
             api.getClient().media.update(self.entry.getId(), mediaEntry)
-        m = api.getClient().media.update
-        print('MEDIA' + str(vars(m)))
         return None
 
     def delTag(self, remove_tag, doUpdate=False):

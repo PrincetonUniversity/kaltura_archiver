@@ -380,8 +380,8 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
         else:
             # original flavor size does not match s3 file size
             # fine if this has been replaced before
-            # so check on relevant tag  (reset kaltura connection to get the updated value)
-            kaltura.api.getClient(True)
+            # so check on relevant tag  after reloading
+            mentry.reload()
             if checker.has_tag(PLACE_HOLDER_VIDEO) and checker.has_tag(SAVED_TO_S3):
                 mentry.log_action(logging.INFO, doit, 'Replaced Earlier',
                                   'According to {} and {} tags at KMC'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3))

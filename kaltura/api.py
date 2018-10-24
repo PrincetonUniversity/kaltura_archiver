@@ -1,13 +1,12 @@
+from KalturaClient import *
+from KalturaClient.Plugins.Core import *
+
+from datetime import datetime
 
 import logging
 
 logger = logging.getLogger('kaltura')
 logger.addHandler(logging.NullHandler())
-
-from KalturaClient import *
-from KalturaClient.Plugins.Core import *
-
-from datetime import datetime
 
 class KalturaLogger(IKalturaLogger):
     def log(self, msg):
@@ -24,17 +23,10 @@ __params__ = {
     'privileges' : "disableentitlement"
 }
 
-def getClient(reload=False):
+def getClient():
     global __client__, __params__
     if (reload):
-        config = KalturaConfiguration(__params__['partner_id'], logger=KalturaLogger())
-        config.serviceUrl = __params__['url']
-        client = KalturaClient(config)
-        logger.info("KALTURA SESSION %s with %s partnerId:%s" % (client.getConfig().serviceUrl, __params__['user_id'], __params__['partner_id']))
-        ks = client.session.start(__params__['secret'], __params__['user_id'], __params__['ktype'],
-                              __params__['partner_id'], __params__['expiry'], __params__['privileges'])
-        client.setKs(ks)
-        __client__ = client
+        pass;
     return __client__;
 
 
@@ -45,7 +37,16 @@ def startSession(partner_id, user_id, secret):
     __params__['partner_id'] = partner_id
     __params__['user_id'] = user_id
     __params__['secret'] = secret
-    c = getClient(reload=True)
+
+    config = KalturaConfiguration(__params__['partner_id'], logger=KalturaLogger())
+    config.serviceUrl = __params__['url']
+    client = KalturaClient(config)
+    logger.info("KALTURA SESSION %s with %s partnerId:%s" % (client.getConfig().serviceUrl, __params__['user_id'], __params__['partner_id']))
+    ks = client.session.start(__params__['secret'], __params__['user_id'], __params__['ktype'],
+                              __params__['partner_id'], __params__['expiry'], __params__['privileges'])
+    client.setKs(ks)
+    __client__ = client
+
     return None
 
 
