@@ -163,6 +163,14 @@ and if the versioned video has the same size, which is even more unlikely, will 
 https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
 
 
+## Execute Tests 
+
+set environment variabes so code connects to TEST KMC, then run: 
+
+~~~
+python -m unittest discover -v test
+~~~
+
 ## Installation
 
 ### Python and Packages 
