@@ -443,9 +443,9 @@ def list(params):
 
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.VIEWS,
-                   kaltura.ENTRY_ID, kaltura.TOTAL_SIZE, SAVED_TO_S3, PLACE_HOLDER_VIDEO,
-                   kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, kaltura.CREATOR_ID,
-                   kaltura.CATEGORIES_IDS, kaltura.CATEGORIES, kaltura.TAGS, kaltura.NAME]
+                   kaltura.ENTRY_ID, SAVED_TO_S3, PLACE_HOLDER_VIDEO,
+                   kaltura.TOTAL_SIZE, kaltura.ORIGINAL_SIZE, kaltura.ORIGINAL_STATUS,
+                   kaltura.CREATOR_ID]
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
