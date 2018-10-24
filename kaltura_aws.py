@@ -443,7 +443,8 @@ def list(params):
 
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.VIEWS,
-                   kaltura.ENTRY_ID, kaltura.TOTAL_SIZE, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
+                   kaltura.ENTRY_ID, kaltura.TOTAL_SIZE, SAVED_TO_S3, PLACE_HOLDER_VIDEO,
+                   kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, kaltura.CREATOR_ID,
                    kaltura.CATEGORIES_IDS, kaltura.CATEGORIES, kaltura.TAGS, kaltura.NAME]
         print('\t'.join(columns))
         for entry in filter:

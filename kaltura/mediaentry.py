@@ -25,6 +25,7 @@ CREATED_AT = 'created'
 CREATED_AT_DATE = 'createdDate'
 DELETED_AT = 'deleted'
 DELETED_AT_DATE = 'deletedDate'
+CREATOR_ID = 'creatorId'
 
 class MediaEntry:
 
@@ -137,7 +138,10 @@ class MediaEntry:
         mediaEntry.tags = self.entry.tags + ", " + newtag
         self.log_action(logging.INFO, doUpdate, 'Add Tag', newtag)
         if doUpdate:
+            print(vars(api.getClient().media))
             api.getClient().media.update(self.entry.getId(), mediaEntry)
+        m = api.getClient().media.update
+        print('MEDIA' + str(vars(m)))
         return None
 
     def delTag(self, remove_tag, doUpdate=False):
@@ -177,6 +181,8 @@ class MediaEntry:
             return (FlavorAssetStatus.str(original.getStatus()) if original else 'MISSING').rjust(len(ORIGINAL_STATUS))
         if column == ORIGINAL_SIZE:
             return "{:>10}".format(original.getSize() if original else '')
+        if column == CREATOR_ID:
+            return "{:>8}".format(self.entry.creatorId)
         has_tag = column in self.entry.getTags()
         return column if has_tag else ''.ljust(len(column))
 
