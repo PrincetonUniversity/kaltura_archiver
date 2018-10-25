@@ -115,7 +115,13 @@ class Filter:
     def played_within_years(self, years):
         return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
 
-    def getCount(self):
+    def get_count(self):
+        """
+        return number of records macthing the tag, category, and lastPlayed data
+
+        this ignores the first_page, page_sizem, and max_iter settings
+        :return: match count
+        """
         return iter(self).last_result.totalCount
 
     def _since_played(self, mode, years):

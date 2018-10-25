@@ -51,6 +51,13 @@ class TestFilterIter(TestKaltura):
 
         self.assertEqual(e.getId(), e_.getId())
 
+    def test_get_count(self):
+        cnt_s3 = kaltura.Filter().first_page(3).page_size(1).max_iter(1).tag(kaltura_aws.SAVED_TO_S3).get_count()
+        self.assertTrue(cnt_s3 > 0)
+        cnt_s3_same = kaltura.Filter().first_page(100).page_size(1).tag(kaltura_aws.SAVED_TO_S3).get_count()
+        self.assertTrue(cnt_s3 == cnt_s3_same)
+        cnt = kaltura.Filter().first_page(3).page_size(1).max_iter(1).get_count()
+        self.assertTrue(cnt_s3 <= cnt)
 
     def _prt_filter(self, filter):
         print('----')
