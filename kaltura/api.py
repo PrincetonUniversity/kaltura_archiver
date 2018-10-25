@@ -51,11 +51,12 @@ def startSession(partner_id, user_id, secret):
     __params__['user_id'] = user_id
     __params__['secret'] = secret
 
-    config = KalturaConfiguration(__params__['partner_id'], logger=KalturaLogger())
-    config.serviceUrl = __params__['url']
-    __client__  = KalturaClient(config)
-    # trigger session start
-    getClient()
+    if __client__ == None:
+        config = KalturaConfiguration(__params__['partner_id'], logger=KalturaLogger())
+        config.serviceUrl = __params__['url']
+        __client__  = KalturaClient(config)
+        # trigger session start
+        getClient()
 
     return None
 
