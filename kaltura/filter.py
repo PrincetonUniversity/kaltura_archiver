@@ -115,6 +115,9 @@ class Filter:
     def played_within_years(self, years):
         return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
 
+    def getCount(self):
+        return iter(self).last_result.totalCount
+
     def _since_played(self, mode, years):
         """
         match if video was was not last played since /within the last years
@@ -171,7 +174,7 @@ class FilterIter:
         self.pager.pageSize = filter.per_page
         self.pager.pageIndex = filter.page -1
         self.max_iter = filter.maximum_iter
-        self.object_iter = iter([])
+        self._next_batch()
 
 
     def next(self):
@@ -179,16 +182,21 @@ class FilterIter:
             raise StopIteration()
 
         try:
-            n = next(self.object_iter)
-            self.max_iter  -= 1
-            return n;
+            return self._next()
         except StopIteration as stp:
-            self.pager.setPageIndex(self.pager.getPageIndex() + 1)
-            objects = api.getClient().media.list(self.filter.filter, self.pager).objects
-            if (objects):
-                api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
-                self.object_iter = iter(api.getClient().media.list(self.filter.filter, self.pager).objects)
-                return self.next()
-            else:
-                #reached the end
-                raise StopIteration()
+            self._next_batch()
+            return self._next()
+
+    def _next_batch(self):
+        self.pager.setPageIndex(self.pager.getPageIndex() + 1)
+        self.last_result = api.getClient().media.list(self.filter.filter, self.pager)
+        if (self.last_result.objects):
+            api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
+            self.object_iter = iter(self.last_result.objects)
+        else:
+            self.object_iter = iter([])
+
+    def _next(self):
+        n = next(self.object_iter)
+        self.max_iter  -= 1
+        return n;
