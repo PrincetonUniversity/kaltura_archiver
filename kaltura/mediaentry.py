@@ -1,6 +1,5 @@
 import api
 import logging
-import tempfile
 import urllib
 import os
 
