@@ -162,6 +162,10 @@ class MediaEntry:
             return "{:>10}".format(api.dateString(self.entry.getLastPlayedAt()))
         if column == LAST_PLAYED:
             return "{:>12}".format(self.entry.getLastPlayedAt())
+        if column == CREATED_AT_DATE:
+            return "{:>10}".format(api.dateString(self.entry.getCreatedAt()))
+        if column == CREATED_AT:
+            return "{:>12}".format(self.entry.getCreatedAt())
         if column == VIEWS:
             return str(self.entry.getViews())
         if column == TOTAL_SIZE:
@@ -183,6 +187,7 @@ class MediaEntry:
             return "{:>10}".format(original.getSize() if original else '')
         if column == CREATOR_ID:
             return "{:>8}".format(self.entry.creatorId)
+
         has_tag = column in self.entry.getTags()
         return column if has_tag else ''.ljust(len(column))
 
