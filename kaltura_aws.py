@@ -8,6 +8,8 @@ import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
 
+from KalturaClient.Plugins.Core import KalturaEntryStatus
+
 import kaltura
 import kaltura.api
 import kaltura.aws as aws
@@ -15,6 +17,8 @@ import kaltura.aws as aws
 PLACE_HOLDER_VIDEO = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
 
+DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4"
+#see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
@@ -53,6 +57,10 @@ It  uses the following environment variables
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=list)
+
+        subparser = subparsers.add_parser('count', description="count matching videos ")
+        KalturaArgParser._add_filter_params(subparser)
+        subparser.set_defaults(func=count)
 
         subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
@@ -430,16 +438,29 @@ def check_config(params):
     setup(params, 'loglevel')
     return 0
 
-def list(params):
+def count(params):
     """
-    print matching kaltura records
+    count matching kaltura media entry records
 
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :param params: hash that contains kaltura connection information as well as filtering options given for the list action
     :return:  None
     """
     setup(params, None)
     filter = _create_filter(params)
-    bucket = params['awsBucket']
+    cnt = filter.get_count()
+    print("#COUNT\t{}".format(cnt))
+    return cnt
+
+
+def list(params):
+    """
+    print matching kaltura records
+
+    :param params: hash that contains kaltura connection information as well as filtering options given for the list action
+    :return:  None
+    """
+    setup(params, None)
+    filter = _create_filter(params)
 
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.VIEWS,
@@ -464,19 +485,19 @@ def list(params):
                 print("\t".join(v.decode('utf-8') for v in vals))
     return None
 
-
 def _create_filter(params):
-    filter = kaltura.Filter()
-    filter.entry_id(params['id'])
-    if 'tag' in params:
-        # implies all the other tags are there too
-        # see ArgParser
-        filter.tag(params['tag'])
-        filter.category(params['category'])
-        filter.years_since_played(params['unplayed']).played_within_years(params['played'])
-        if (params['noLastPlayed']) :
-             filter.undefined_LAST_PLAYED_AT()
-        filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries'])
+    filter = kaltura.Filter().entry_id(params['id'])
+    if  params['id'] is None:
+        filter.status(DEFAULT_STATUS_LIST)
+        if 'tag' in params:
+            # implies all the other tags are there too
+            # see ArgParser
+            filter.tag(params['tag'])
+            filter.category(params['category'])
+            filter.years_since_played(params['unplayed']).played_within_years(params['played'])
+            if (params['noLastPlayed']) :
+                 filter.undefined_LAST_PLAYED_AT()
+            filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries'])
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 

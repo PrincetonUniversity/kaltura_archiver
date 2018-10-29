@@ -45,6 +45,18 @@ class Filter:
             api.logger.debug("Filter.entryId: NOOP ")
         return self
 
+    def status(self, status):
+        """
+        filter on KalturaEntryStatus constant
+        :param status:
+        :return:
+        """
+        if self.filter.statusIn == NotImplemented:
+            self.filter.statusIn = str(status)
+        else:
+            self.filter.statusIn += ",{}".format(status)
+        return self
+
     def tag(self, tag):
         """
         if tag does not start with '!' match if it (partially) matches kaltura media entry tag

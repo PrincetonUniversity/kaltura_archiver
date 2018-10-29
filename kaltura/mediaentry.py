@@ -5,26 +5,26 @@ import os
 
 from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource, KalturaFlavorAssetStatus
 
-ENTRY_ID = 'entry-id'
-FLAVOR_ID = 'flavor-id'
-LAST_PLAYED = 'lastPlayed'
-LAST_PLAYED_DATE = 'lastPlayedDate'
+ENTRY_ID = 'entry_id'
+FLAVOR_ID = 'flavor_id'
+LAST_PLAYED = 'last_played'
+LAST_PLAYED_DATE = 'last_played_date'
 VIEWS = 'views'
 ORIGINAL = 'original'
-ORIGINAL_STATUS = 'orig-status'
-ORIGINAL_SIZE = 'orig-size'
-TOTAL_SIZE = 'total-size(KB)'
-SIZE = 'size(KB)'
+ORIGINAL_STATUS = 'orig_status'
+ORIGINAL_SIZE = 'orig_KB'
+TOTAL_SIZE = 'total_KB'
+SIZE = 'size_KB'
 TAGS = 'tags'
 CATEGORIES = 'categories'
-CATEGORIES_IDS = 'categoryIds'
+CATEGORIES_IDS = 'category_ids'
 NAME = 'name'
 STATUS = 'status'
 CREATED_AT = 'created'
-CREATED_AT_DATE = 'createdDate'
+CREATED_AT_DATE = 'created_date'
 DELETED_AT = 'deleted'
-DELETED_AT_DATE = 'deletedDate'
-CREATOR_ID = 'creatorId'
+DELETED_AT_DATE = 'deleted_date'
+CREATOR_ID = 'creator_id'
 
 class MediaEntry:
 
