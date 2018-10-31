@@ -1,4 +1,8 @@
-import api
+try:
+    import api
+except Exception as e:
+    from . import api
+
 import logging
 import urllib
 import os

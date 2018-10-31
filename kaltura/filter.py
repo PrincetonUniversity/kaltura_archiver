@@ -4,6 +4,11 @@ import calendar
 
 from KalturaClient.Plugins.Core import *
 
+try:
+    import api
+except Exception as e:
+    from . import api
+
 import api
 
 class Filter:
