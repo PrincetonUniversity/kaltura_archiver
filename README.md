@@ -126,7 +126,7 @@ that captures the videos you want to work on, then do:
 ~~~
 
 kaltura_aws.py  archive  [filter-options]
-kaltura_aws.py  replace_video [filter-options]
+kaltura_aws.py  s3copy [filter-options]
 kaltura_aws.py  status [filter-options]
 ~~~
    
@@ -158,9 +158,47 @@ The kaltura_aws.py command will error out when asked to replace the video unless
 So only if a video is replaced after archival which is unlikely since few users have that ability 
 and if the versioned video has the same size, which is even more unlikely, will the procedure loose the versioned video. 
 
+### reports ### 
+
+### video list with creator ids and their ldap status ### 
+Use this report to generate a list of videos with information on the creator associated with the entry: 
+   1. creators netid 
+   1. active/inactive axcxording to ldap 
+   1. name 
+   1. org unit 
+   
+   
+ldap expression that determines whether an account is active: 
+~~~
+(&(uid=<NETID>)(|(puresource=authentication=enabled)(puresource=authentication=goingaway)))
+~~~
+
+~~~ 
+./kaltura_aws.py list   [filter-options]a > list.tsv 
+cat list.tsv | add_ldap_status.py > emhanced_list.tsv 
+~~~
 
 ### See Early Requirements  
 https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
+
+
+## Troubleshooting 
+
+### Manually test ldap credentials/search on CLI
+
+run on the command line  - you may have to install the [openldap package](http://www.openldap.org)
+
+on EC2 server run 'sudo yum install openldap-clients'
+
+Look for 'puresource=a-W iod=monikam uthentication=disabled' ; print only dn property
+~~~
+ldapsearch -LLL -x -H "ldaps://$LDAP_SERVER/" -b "o=Princeton University,c=US" -D "uid=NETID,o=princeton university,c=us" -W 'puresource=authentication=disabled' 1.1
+~~~
+
+Look for entries with a valid uid and with no pususpended value; in addition to dn, print uid and puresource properties
+~~~
+ldapsearch -LLL -x -H "ldaps://$LDAP_SERVER/" -b "o=Princeton University,c=US" -D "uid=NETID,o=princeton university,c=us" -W '(&(uid=*)(!(pususpended=*)))' uid puresource
+~~~
 
 
 ## Execute Tests 
