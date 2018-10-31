@@ -178,6 +178,16 @@ ldap expression that determines whether an account is active:
 cat list.tsv | add_ldap_status.py > emhanced_list.tsv 
 ~~~
 
+### rough statistics ###
+
+counts video entries that have been played in the laste 20 years 
+
+cmputes TB of entries that were played in the last year 
+
+~~~
+stats.py
+~~~
+
 ### See Early Requirements  
 https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
 
