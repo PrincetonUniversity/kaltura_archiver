@@ -18,6 +18,7 @@ class Filter:
         self.filter = KalturaMediaEntryFilter()
         self.filter.mediaTypeEqual = mediaType
         self.filter.orderBy = "+createdAt"  # Oldest first
+        self.filter.fields = "id,name,plays,createdAt,duration,status,tags,categoriesIds,sourceType"
         self.page  = 1
         self.per_page  = Filter.PAGER_CHUNK
         self.maximum_iter  = -1
