@@ -12,7 +12,7 @@ except Exception as e:
 import api
 
 class Filter:
-    PAGER_CHUNK = 500
+    MAX_PAGE_SIZE = 500
 
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
         self.filter = KalturaMediaEntryFilter()
@@ -20,7 +20,7 @@ class Filter:
         self.filter.orderBy = "+createdAt"  # Oldest first
         self.filter.fields = "id,name,plays,createdAt,duration,status,tags,categoriesIds,sourceType"
         self.page  = 1
-        self.per_page  = Filter.PAGER_CHUNK
+        self.per_page  = Filter.MAX_PAGE_SIZE
         self.maximum_iter  = -1
 
     def first_page(self, page):
@@ -28,6 +28,9 @@ class Filter:
         return self
 
     def page_size(self, size):
+        if (size > Filter.MAX_PAGE_SIZE):
+            api.logger.error("Filter.page_size: {} exceeds MAX page size of {}".format(size, Filter.MAX_PAGE_SIZE))
+            size = Filter.MAX_PAGE_SIZE
         self.per_page = size
         return self
 
