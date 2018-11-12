@@ -109,6 +109,7 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
                                help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
         subparser.add_argument("--max_entries", "-M",  type=int, default=-1, help="maximum number of entries to work on  - default unlimited")
+        subparser.add_argument("--created", "-C",  type=int, help="creation time greater or equal given int (sec since UNIX)")
         return None
 
 
@@ -497,7 +498,7 @@ def _create_filter(params):
             filter.years_since_played(params['unplayed']).played_within_years(params['played'])
             if (params['noLastPlayed']) :
                  filter.undefined_LAST_PLAYED_AT()
-            filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries'])
+            filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries']).created_greater_equal(params['created'])
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 

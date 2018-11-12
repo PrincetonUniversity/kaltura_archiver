@@ -18,7 +18,6 @@ class Filter:
         self.filter = KalturaMediaEntryFilter()
         self.filter.mediaTypeEqual = mediaType
         self.filter.orderBy = "+createdAt"  # Oldest first
-        self.filter.fields = "id,name,plays,createdAt,duration,status,tags,categoriesIds,sourceType"
         self.page  = 1
         self.per_page  = Filter.MAX_PAGE_SIZE
         self.maximum_iter  = -1
@@ -135,6 +134,10 @@ class Filter:
 
     def played_within_years(self, years):
         return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
+
+    def created_greater_equal(self, gm_time):
+        if (gm_time != None):
+            self.filter.createdAtGreaterThanOrEqual = gm_time
 
     def get_count(self):
         """
