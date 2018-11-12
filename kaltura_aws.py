@@ -2,13 +2,10 @@
 import logging, traceback
 import os
 import sys
-import tempfile
 
 import boto3
 from argparse import RawDescriptionHelpFormatter
 import envvars
-
-from KalturaClient.Plugins.Core import KalturaEntryStatus
 
 import kaltura
 import kaltura.api
@@ -19,6 +16,8 @@ SAVED_TO_S3 = "archived_to_s3"
 
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4"
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
+
+REPLACE_ONLY_IF_YEARS_SINCE_PLAYED = 2
 
 class KalturaArgParser(envvars.ArgumentParser):
     ENV_VARS = {'partnerId': 'KALTURA_PARTNERID|Kaltura Partner Id|',
@@ -325,6 +324,10 @@ def replace_videos(params):
     """
     doit = setup(params, 'replace')
     filter = _create_filter(params)
+    if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
+        filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
+        kaltura.logger.info("FILTER ADJUSTED {}".format(filter))
+
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
@@ -380,7 +383,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                     if mentry.replaceOriginal(place_holder, doit):
                         # indicate successful replace
                         mentry.addTag(PLACE_HOLDER_VIDEO, doit)
-                        mentry.log_action(logging.ERROR, doit, 'Replace', 'Complete');
+                        mentry.log_action(logging.INFO, doit, 'Replace', 'Complete');
                         failure = False
             else:
                 # s3 file in bucket but exceed size limit
