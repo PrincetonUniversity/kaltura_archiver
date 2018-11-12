@@ -57,7 +57,10 @@ def _enhance(tsvin, entryid_col, netid_col, ldap):
                 name  = data['displayName'][0]
             elif data['cn']:
                 name = data['cn'][0]
-            ou = data['ou'][0]
+            if ('ou' in data): 
+                ou = data['ou'][0]
+            else: 
+                ou = ''
             status = 'active'
         except StopIteration as e:
             status = 'inactive'
