@@ -223,19 +223,20 @@ def entry_health_check(mentry, bucket):
         explanation= 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
 
-    compatible_size = aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket))
-    # if it is saved and not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
-    if healthy and saved_tag and not replaced_tag and not compatible_size:
-        explanation = 'ERROR: is {} and not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
-        healthy = False
+    if (original):
+        compatible_size = aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket))
+        # if it is saved and not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
+        if healthy and saved_tag and not replaced_tag and not compatible_size:
+            explanation = 'ERROR: is {} and not {} - size mismatch of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
+            healthy = False
 
-    # if it is saved and sizes match then there should not be a replaced_tag
-    if healthy  and saved_tag and compatible_size and replaced_tag:
-        explanation = 'ERROR: is {} and  {} - but size match of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
-        healthy = False
+        # if it is saved and sizes match then there should not be a replaced_tag
+        if healthy  and saved_tag and compatible_size and replaced_tag:
+            explanation = 'ERROR: is {} and  {} - but size match of bucket entry and original flavor'.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
+            healthy = False
 
-    if (healthy and s3Exists and original.getSize() > CheckAndLog.SIZE_LIMIT_KB):
-        explanation= 'WARNING: in bucket {} but original beyond size limit {}'.format(bucket, CheckAndLog.SIZE_LIMIT_KB)
+        if (healthy and s3Exists and original.getSize() > CheckAndLog.SIZE_LIMIT_KB):
+            explanation= 'WARNING: in bucket {} but original beyond size limit {}'.format(bucket, CheckAndLog.SIZE_LIMIT_KB)
 
     if (healthy and not explanation):
         explanation= 'HEALTHY'
@@ -597,19 +598,21 @@ def _setup(params, doit_prop):
         raise(RuntimeError("Can't access AWS Bucket '{}'".format(bucket)))
     return doit
 
-def _main(args):
+def _main(argv):
+    parser = KalturaArgParser.create()
+    args = parser.parse_args(argv)
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
-    params.update(args)
+    print(args)
+    params.update(vars(args))
     return params['func'](params)
 
 if __name__ == '__main__':
-    parser = KalturaArgParser.create()
     try:
-        args = parser.parse_args()
-        status = _main(vars(args))
+        status = _main(sys.argv[1:])
         sys.exit(status)
     except Exception as e:
         print("\n" + str(e) + "\n")
+        parser = KalturaArgParser.create()
         parser.print_usage()
         if (True or not isinstance(e, RuntimeError)):
             traceback.print_exc()
