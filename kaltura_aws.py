@@ -2,6 +2,7 @@
 import logging, traceback
 import os
 import sys
+import time
 
 import boto3
 from argparse import RawDescriptionHelpFormatter
@@ -16,6 +17,9 @@ SAVED_TO_S3 = "archived_to_s3"
 
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4"
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
+
+from KalturaClient.Plugins.Core import  KalturaEntryStatus
+
 
 REPLACE_ONLY_IF_YEARS_SINCE_PLAYED = 2
 
@@ -245,7 +249,7 @@ def copy_to_s3(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    doit = setup(params, 's3copy')
+    doit = _setup(params, 's3copy')
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
@@ -285,15 +289,21 @@ def restore_from_s3(params):
     :param params: hash that contains kaltura connection information as well as filtering options given for the restore action
     :return:  number of error s envountered
     """
-    doit = setup(params, 'restore')
+    doit = _setup(params, 'restore')
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
-    nerror = 0
+    counts = [0,0,0]
     for entry in filter:
-        if (not restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, tmp, doit)):
-            nerror += 1
-    return nerror;
+        rc = restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, tmp, doit)
+        counts[rc] += 1
+
+    kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
+    return counts[REPLACE_FAILED]
+
+    return rc[RESTORE_FAILED];
 
 
 def download(params):
@@ -303,7 +313,7 @@ def download(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    doit = setup(params, None)
+    doit = _setup(params, None)
     tmp = params['tmp']
     filter = _create_filter(params)
     entry =   next(iter(filter))
@@ -322,7 +332,7 @@ def replace_videos(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    doit = setup(params, 'replace')
+    doit = _setup(params, 'replace')
     filter = _create_filter(params)
     if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
         filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
@@ -331,12 +341,40 @@ def replace_videos(params):
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
-    nerror = 0
+    counts = [0, 0, 0, 0]
+    entries = []
     for entry in filter:
-        if (not replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)):
-            nerror += 1
+        rc = replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)
+        counts[rc] += 1
+        if (rc == REPLACE_DONE):
+            entries.append(entry)
 
-    return nerror
+    if (entries):
+        # pause to give Kaltura time to concert the replace ment videos
+        _pause(10 + len(entries) *3, doit)
+
+        #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
+        good_status = [KalturaEntryStatus.READY]
+        for entry in entries:
+            mentry = kaltura.MediaEntry(entry)
+            mentry.reload()
+            if (not mentry.entry.getStatus().value in good_status):
+                mentry.log_action(logging.ERROR, doit, 'Replace Failed', 'Video status {} not in {}'.format(entry.getStatus().value, good_status))
+                counts[REPLACE_FAILED] += 1
+
+    kaltura.logger.info("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
+    kaltura.logger.info("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
+    kaltura.logger.info("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
+    kaltura.logger.info("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
+    return counts[REPLACE_FAILED]
+
+def _pause(secs, doit):
+    for i in range(0,secs):
+        sys.stdout.write('.')
+        sys.stdout.flush()
+        if (doit):
+            time.sleep(1)
+    sys.stdout.write('\n')
 
 def health_check(params):
     """
@@ -344,7 +382,7 @@ def health_check(params):
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params, None)
+    _setup(params, None)
     filter = _create_filter(params)
     bucket = params['awsBucket']
 
@@ -370,9 +408,24 @@ def health_check(params):
     return nerror
 
 
+REPLACE_DONE  = 0
+REPLACE_DONE_BEFORE = 1
+REPLACE_BIG_FILE_SKIP = 2
+REPLACE_FAILED = 3
+
 def replace_entry_video(mentry, place_holder, bucket, doit):
+    """
+    if preconditions are given replace video with given place holder
+
+    :param mentry: kaltura.MediaEntry to be replaced
+    :param place_holder:  place holder video file
+    :param bucket: bucket tat contains s3 copy of original
+    :param doit: log actions only unless doit is true
+    :return: REPLACE_DONE, REPLACE_DONE_BEFORE, REPLACE_BIG_FILE_SKIP, or REPLACE_FAILED
+
+    """
     checker = CheckAndLog(mentry)
-    failure = True
+    rc = REPLACE_FAILED
     if (checker.has_original() and checker.original_ready()):
         if (checker.aws_s3_matching_file(bucket)):
             # s3 file in bucket that matches in size
@@ -384,11 +437,11 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                         # indicate successful replace
                         mentry.addTag(PLACE_HOLDER_VIDEO, doit)
                         mentry.log_action(logging.INFO, doit, 'Replace', 'Complete');
-                        failure = False
+                        rc = REPLACE_DONE
             else:
                 # s3 file in bucket but exceed size limit
                 mentry.log_action(logging.WARN, doit, 'Skip Replace', 'Big s3 file - can\'t be restored')
-                failure = False
+                rc = REPLACE_BIG_FILE_SKIP
         else:
             # original flavor size does not match s3 file size
             # fine if this has been replaced before
@@ -397,16 +450,19 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
             if checker.has_tag(PLACE_HOLDER_VIDEO) and checker.has_tag(SAVED_TO_S3):
                 mentry.log_action(logging.INFO, doit, 'Replaced Earlier',
                                   'According to {} and {} tags at KMC'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3))
-                failure = False
-    if (failure):
+                rc = REPLACE_DONE_BEFORE
+    if (rc == REPLACE_FAILED):
         mentry.log_action(logging.ERROR, doit, 'Replace Failed', '');
-    return not failure;
+    return rc;
 
+RESTORE_DONE = 0
+RESTORE_WAIT_GLACIER = 1
+RESTORE_FAILED = 2
 
 def restore_entry_from_s3(mentry, bucket, tmp, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
-    failure = True;
+    rc = RESTORE_FAILED;
     to_file = None
 
     if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
@@ -421,25 +477,19 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
                 if (mentry.replaceOriginal(to_file, doit)):
                     # indicate that this is not the place_holder (but original) video
                     mentry.delTag(PLACE_HOLDER_VIDEO)
-                    failure = False
+                    rc = RESTORE_DONE
         else:
             mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
-            failure = False
+            rc = RESTORE_WAIT_GLACIER
 
     if (to_file):
         os.remove(to_file)
-    if (failure):
+    if (rc == RESTORE_FAILED):
         mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
-    return not failure
-
-
-def check_entry_ready(mentry):
-    checker = CheckAndLog(mentry)
-    return checker.has_original() and checker.original_ready()
-
+    return rc
 
 def check_config(params):
-    setup(params, 'loglevel')
+    _setup(params, 'loglevel')
     return 0
 
 def count(params):
@@ -449,11 +499,11 @@ def count(params):
     :param params: hash that contains kaltura connection information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params, None)
+    _setup(params, None)
     filter = _create_filter(params)
     cnt = filter.get_count()
     print("#COUNT\t{}".format(cnt))
-    return cnt
+    return 0
 
 
 def list(params):
@@ -463,7 +513,7 @@ def list(params):
     :param params: hash that contains kaltura connection information as well as filtering options given for the list action
     :return:  None
     """
-    setup(params, None)
+    _setup(params, None)
     filter = _create_filter(params)
 
     if (params['mode'] == 'video'):
@@ -487,7 +537,7 @@ def list(params):
                 kf = kaltura.Flavor(f)
                 vals = [kf.report_str(c) for c in columns]
                 print("\t".join(v.decode('utf-8') for v in vals))
-    return None
+    return 0
 
 def _create_filter(params):
     filter = kaltura.Filter().entry_id(params['id'])
@@ -505,7 +555,7 @@ def _create_filter(params):
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
-def setup(params, doit_prop):
+def _setup(params, doit_prop):
     doit = params[doit_prop] if doit_prop else True
     handler = logging.StreamHandler()
     formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
