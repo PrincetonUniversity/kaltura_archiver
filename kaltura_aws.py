@@ -94,7 +94,7 @@ check status of entries, that is check each matching entry for the following:
   +  the {} tag is set iff and only iff there is a corresponding entry in S3 
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
-        subparser = subparsers.add_parser('status', description=description)
+        subparser = subparsers.add_parser('health', description=description)
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=health_check)
 
@@ -478,7 +478,6 @@ def health_check(params):
 
     columns = []
     nerror = 0
-
 
     print('\t'.join(columns))
     columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
