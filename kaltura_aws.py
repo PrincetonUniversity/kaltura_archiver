@@ -381,9 +381,10 @@ def replace_videos(params):
     """
     doit = _setup(params, 'replace')
     filter = _create_filter(params)
-    if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
-        filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
-        kaltura.logger.info("FILTER ADJUSTED {}".format(filter))
+    if not params['id']:
+        if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
+            filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
+            kaltura.logger.info("FILTER ADJUSTED {}".format(filter))
 
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
@@ -567,12 +568,6 @@ def _create_filter(params):
 
 def _setup(params, doit_prop):
     doit = params[doit_prop] if doit_prop else True
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
-    handler.setFormatter(formatter)
-    kaltura.logger.addHandler(handler)
-
-    logging.root.setLevel(logging.INFO)
     kaltura.logger.setLevel(params['loglevel'])
 
     kaltura.logger.info("---")
@@ -602,12 +597,19 @@ def _main(argv):
     parser = KalturaArgParser.create()
     args = parser.parse_args(argv)
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
-    print(args)
     params.update(vars(args))
     return params['func'](params)
 
+def _init_loggers():
+    handler = logging.StreamHandler()
+    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
+    handler.setFormatter(formatter)
+    kaltura.logger.addHandler(handler)
+
 if __name__ == '__main__':
     try:
+        _init_loggers()
+        logging.root.setLevel(logging.INFO)
         status = _main(sys.argv[1:])
         sys.exit(status)
     except Exception as e:
