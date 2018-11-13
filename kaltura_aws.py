@@ -282,12 +282,39 @@ def copy_to_s3(params):
 
     return nerror
 
+def download(params):
+    """
+    save original flavors of first matching record to a local file
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given to download action
+    :return:  0 upon succesful download
+    """
+    doit = _setup(params, None)
+    tmp = params['tmp']
+    filter = _create_filter(params)
+    entry =   next(iter(filter))
+
+    checker = CheckAndLog(kaltura.MediaEntry(entry))
+    if (checker.has_original() and checker.original_ready()):
+        fname = checker.mentry.downloadOriginal(tmp, doit)
+        print("downloded to " + fname)
+        return 0
+    else:
+        return 1
+
+
+RESTORE_DONE = 0
+RESTORE_WAIT_GLACIER = 1
+RESTORE_FAILED = 2
+
 def restore_from_s3(params):
     """
     restore original flavor from s3   for  matching kaltura records
 
+    prints number counts of videos with different outcomes:  RESTORE_DONE, RESTORE_WAIT_GLACIER, RESTORE_FAILED
+
     :param params: hash that contains kaltura connection information as well as filtering options given for the restore action
-    :return:  number of error s envountered
+    :return:  number of failures
     """
     doit = _setup(params, 'restore')
     filter = _create_filter(params)
@@ -306,29 +333,48 @@ def restore_from_s3(params):
     return rc[RESTORE_FAILED];
 
 
-def download(params):
-    """
-    save original flavors to aws  for  matching kaltura records
+def restore_entry_from_s3(mentry, bucket, tmp, doit):
+    checker = CheckAndLog(mentry)
+    s3_file = mentry.entry.getId()
+    rc = RESTORE_FAILED;
+    to_file = None
 
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    doit = _setup(params, None)
-    tmp = params['tmp']
-    filter = _create_filter(params)
-    entry =   next(iter(filter))
+    if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
+        # see whether we can get the S3 file - might still be in glacier
+        if aws.s3_restore(s3_file, bucket, doit):
+            # download from S3
+            to_file = aws.s3_download( "{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
 
-    checker = CheckAndLog(kaltura.MediaEntry(entry))
-    if (checker.has_original() and checker.original_ready()):
-        fname = checker.mentry.downloadOriginal(tmp, doit)
-        print("downloded to " + fname)
-        return 0
-    else:
-        return 1
+            # delete all flavors
+            if mentry.deleteFlavors(doDelete=doit):
+                # replace with original from s3
+                if (mentry.replaceOriginal(to_file, doit)):
+                    # indicate that this is not the place_holder (but original) video
+                    mentry.delTag(PLACE_HOLDER_VIDEO)
+                    rc = RESTORE_DONE
+        else:
+            mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
+            rc = RESTORE_WAIT_GLACIER
+
+    if (to_file):
+        os.remove(to_file)
+    if (rc == RESTORE_FAILED):
+        mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
+    return rc
+
+
+
+REPLACE_DONE  = 0
+REPLACE_DONE_BEFORE = 1
+REPLACE_BIG_FILE_SKIP = 2
+REPLACE_FAILED = 3
 
 def replace_videos(params):
     """
     replace original videos with place holder video for matching entries
+
+    prints counts of videos with different outcomes: REPLACE_DONE, REPLACE_DONE_BEFORE, REPLACE_BIG_FILE_SKIP, REPLACE_FAILED
+
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
     :return:  None
     """
@@ -368,50 +414,6 @@ def replace_videos(params):
     kaltura.logger.info("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
     return counts[REPLACE_FAILED]
 
-def _pause(secs, doit):
-    for i in range(0,secs):
-        sys.stdout.write('.')
-        sys.stdout.flush()
-        if (doit):
-            time.sleep(1)
-    sys.stdout.write('\n')
-
-def health_check(params):
-    """
-    TODO
-    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
-    """
-    _setup(params, None)
-    filter = _create_filter(params)
-    bucket = params['awsBucket']
-
-    columns = []
-    nerror = 0
-
-
-    print('\t'.join(columns))
-    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
-               PLACE_HOLDER_VIDEO, SAVED_TO_S3]
-    print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, '---'])
-    for entry in filter:
-        mentry = kaltura.MediaEntry(entry);
-        healthy, message = entry_health_check(mentry, bucket)
-        vals = [mentry.report_str(kaltura.ENTRY_ID), str(healthy).ljust(len('status-ok'))]
-        vals = vals + [mentry.report_str(c) for c in columns]
-        vals = vals + [str(aws.s3_size(entry.getId(), bucket)/1024), mentry.report_str(kaltura.ORIGINAL_SIZE), message]
-
-        print "\t".join(v.decode('utf-8') for v in vals)
-        if (not healthy):
-            mentry.log_action(logging.ERROR, True, 'STATUS', message)
-            nerror +=1
-    return nerror
-
-
-REPLACE_DONE  = 0
-REPLACE_DONE_BEFORE = 1
-REPLACE_BIG_FILE_SKIP = 2
-REPLACE_FAILED = 3
 
 def replace_entry_video(mentry, place_holder, bucket, doit):
     """
@@ -455,38 +457,46 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
         mentry.log_action(logging.ERROR, doit, 'Replace Failed', '');
     return rc;
 
-RESTORE_DONE = 0
-RESTORE_WAIT_GLACIER = 1
-RESTORE_FAILED = 2
 
-def restore_entry_from_s3(mentry, bucket, tmp, doit):
-    checker = CheckAndLog(mentry)
-    s3_file = mentry.entry.getId()
-    rc = RESTORE_FAILED;
-    to_file = None
+def _pause(secs, doit):
+    for i in range(0,secs):
+        sys.stdout.write('.')
+        sys.stdout.flush()
+        if (doit):
+            time.sleep(1)
+    sys.stdout.write('\n')
 
-    if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
-        # see whether we can get the S3 file - might still be in glacier
-        if aws.s3_restore(s3_file, bucket, doit):
-            # download from S3
-            to_file = aws.s3_download( "{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
+def health_check(params):
+    """
+    TODO
+    :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
+    :return:  None
+    """
+    _setup(params, None)
+    filter = _create_filter(params)
+    bucket = params['awsBucket']
 
-            # delete all flavors
-            if mentry.deleteFlavors(doDelete=doit):
-              # replace with original from s3
-                if (mentry.replaceOriginal(to_file, doit)):
-                    # indicate that this is not the place_holder (but original) video
-                    mentry.delTag(PLACE_HOLDER_VIDEO)
-                    rc = RESTORE_DONE
-        else:
-            mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
-            rc = RESTORE_WAIT_GLACIER
+    columns = []
+    nerror = 0
 
-    if (to_file):
-        os.remove(to_file)
-    if (rc == RESTORE_FAILED):
-        mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
-    return rc
+
+    print('\t'.join(columns))
+    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
+               PLACE_HOLDER_VIDEO, SAVED_TO_S3]
+    print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, '---'])
+    for entry in filter:
+        mentry = kaltura.MediaEntry(entry);
+        healthy, message = entry_health_check(mentry, bucket)
+        vals = [mentry.report_str(kaltura.ENTRY_ID), str(healthy).ljust(len('status-ok'))]
+        vals = vals + [mentry.report_str(c) for c in columns]
+        vals = vals + [str(aws.s3_size(entry.getId(), bucket)/1024), mentry.report_str(kaltura.ORIGINAL_SIZE), message]
+
+        print "\t".join(v.decode('utf-8') for v in vals)
+        if (not healthy):
+            mentry.log_action(logging.ERROR, True, 'STATUS', message)
+            nerror +=1
+    return nerror
+
 
 def check_config(params):
     _setup(params, 'loglevel')
