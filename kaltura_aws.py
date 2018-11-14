@@ -71,7 +71,7 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=copy_to_s3)
 
-        subparser = subparsers.add_parser('restore', description="restore matching videos from AWS-s3")
+        subparser = subparsers.add_parser('restore_from_s3', description="restore matching videos from AWS-s3")
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
@@ -305,8 +305,9 @@ def download(params):
 
 
 RESTORE_DONE = 0
-RESTORE_WAIT_GLACIER = 1
-RESTORE_FAILED = 2
+RESTORE_DONE_BEFORE = 1
+RESTORE_WAIT_GLACIER = 2
+RESTORE_FAILED = 3
 
 def restore_from_s3(params):
     """
@@ -321,44 +322,57 @@ def restore_from_s3(params):
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
-    counts = [0,0,0]
+    counts = [0,0,0, 0]
     for entry in filter:
         rc = restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, tmp, doit)
         counts[rc] += 1
 
     kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
     kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_DONE_BEFORE', counts[RESTORE_DONE_BEFORE]) )
     kaltura.logger.info("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
-    return counts[REPLACE_FAILED]
-
-    return rc[RESTORE_FAILED];
+    return counts[RESTORE_FAILED]
 
 
 def restore_entry_from_s3(mentry, bucket, tmp, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
-    rc = RESTORE_FAILED;
-    to_file = None
 
-    if (checker.has_original() and checker.original_ready()) and aws.s3_exists(s3_file, bucket) and checker.has_tag(PLACE_HOLDER_VIDEO):
+    if (not aws.s3_exists(s3_file, bucket)):
+        mentry.log_action(logging.ERROR, doit, 'Restore Failed', 'No s3 file');
+        return RESTORE_FAILED
+    # we have s3 file
+
+    if not (checker.has_original() and checker.original_ready()):
+        mentry.log_action(logging.ERROR, doit, 'Restore Failed', 'Unhealthy original');
+        return RESTORE_FAILED
+    # we have original and original is READY
+
+    if not checker.has_tag(PLACE_HOLDER_VIDEO) and checker.aws_s3_matching_file(bucket):
+        mentry.log_action(logging.INFO, doit, 'Restored Before', 's3 file and original flavor have compatible sizes');
+        return RESTORE_DONE_BEFORE
+
+    rc = RESTORE_FAILED
+    if checker.has_tag(PLACE_HOLDER_VIDEO):
         # see whether we can get the S3 file - might still be in glacier
         if aws.s3_restore(s3_file, bucket, doit):
             # download from S3
-            to_file = aws.s3_download( "{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
+            to_file = aws.s3_download("{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
 
             # delete all flavors
             if mentry.deleteFlavors(doDelete=doit):
                 # replace with original from s3
                 if (mentry.replaceOriginal(to_file, doit)):
                     # indicate that this is not the place_holder (but original) video
-                    mentry.delTag(PLACE_HOLDER_VIDEO)
+                    mentry.delTag(PLACE_HOLDER_VIDEO, doit)
+                    mentry.log_action(logging.INFO, doit, 'Restore Complete', '')
                     rc = RESTORE_DONE
+            if (doit):
+                os.remove(to_file)
         else:
             mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
             rc = RESTORE_WAIT_GLACIER
 
-    if (to_file):
-        os.remove(to_file)
     if (rc == RESTORE_FAILED):
         mentry.log_action(logging.ERROR, doit, 'Restore Failed', '');
     return rc
@@ -369,6 +383,7 @@ REPLACE_DONE  = 0
 REPLACE_DONE_BEFORE = 1
 REPLACE_BIG_FILE_SKIP = 2
 REPLACE_FAILED = 3
+REPLACE_INCOMPLETE = 4
 
 def replace_videos(params):
     """
@@ -389,28 +404,34 @@ def replace_videos(params):
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
-    counts = [0, 0, 0, 0]
+    counts = [0, 0, 0, 0, 0]
     entries = []
     for entry in filter:
         rc = replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)
-        counts[rc] += 1
         if (rc == REPLACE_DONE):
             entries.append(entry)
+        else:
+            counts[rc] += 1
 
     if (entries):
         # pause to give Kaltura time to concert the replace ment videos
-        _pause(10 + len(entries) *3, doit)
+        _pause(10 + len(entries) * 3, doit)
 
         #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
-        good_status = [KalturaEntryStatus.READY]
+        good_status = [int(KalturaEntryStatus.READY)]
         for entry in entries:
             mentry = kaltura.MediaEntry(entry)
             mentry.reload()
-            if (not mentry.entry.getStatus().value in good_status):
+            print(mentry.entry.getStatus().value.__class__)
+            print(int(mentry.entry.getStatus().value), good_status)
+            if not (int(mentry.entry.getStatus().value) in good_status):
                 mentry.log_action(logging.ERROR, doit, 'Replace Failed', 'Video status {} not in {}'.format(entry.getStatus().value, good_status))
-                counts[REPLACE_FAILED] += 1
+                counts[REPLACE_INCOMPLETE] += 1
+            else:
+                counts[REPLACE_DONE] += 1
 
     kaltura.logger.info("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
+    kaltura.logger.info("# {}: {}".format('REPLACE_INCOMPLETE', counts[REPLACE_INCOMPLETE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
@@ -440,7 +461,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
                     if mentry.replaceOriginal(place_holder, doit):
                         # indicate successful replace
                         mentry.addTag(PLACE_HOLDER_VIDEO, doit)
-                        mentry.log_action(logging.INFO, doit, 'Replace', 'Complete');
+                        mentry.log_action(logging.INFO, doit, 'Replace', 'Done');
                         rc = REPLACE_DONE
             else:
                 # s3 file in bucket but exceed size limit
@@ -462,7 +483,7 @@ def replace_entry_video(mentry, place_holder, bucket, doit):
 
 def _pause(secs, doit):
     for i in range(0,secs):
-        sys.stdout.write('.')
+        sys.stdout.write('|')
         sys.stdout.flush()
         if (doit):
             time.sleep(1)
