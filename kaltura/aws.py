@@ -39,10 +39,16 @@ def s3_store(src_file, bucketname, bucketfile, doit=False):
     return None
 
 def s3_download(to_file, bucketname, bucketfile, doit=False):
-    _s3.meta.client.download_file(bucketname, bucketfile, to_file)
-    api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Download", "to s3://{}/{} to {}".format(bucketname,  bucketfile, to_file))
+    if (doit):
+        _s3.meta.client.download_file(bucketname, bucketfile, to_file)
+    api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Download", "s3://{}/{} to {}".format(bucketname,  bucketfile, to_file))
     return to_file
 
+def s3_delete(bucketname, bucketfile, doit=False):
+    if (doit):
+        _s3.Object(bucket_name=bucketname, key=bucketfile).delete()
+    api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Delete", "s3://{}/{}".format(bucketname,  bucketfile))
+    return None
 
 def s3_restore(filename, bucketname, doit=False):
     """
