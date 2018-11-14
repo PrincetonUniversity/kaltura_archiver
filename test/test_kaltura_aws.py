@@ -25,7 +25,7 @@ class TestKalturaAwsCli(TestKaltura):
 
     @classmethod
     def tearDownClass(cls):
-        if (False):
+        if (True):
             print("-- tearDownClass {}".format(cls))
             #bring back to no s3 file no tags
             aws.s3_delete(TestKaltura.bucket, TestKalturaAwsCli.entry_id, True)
