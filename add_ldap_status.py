@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import sys, argparse, logging
+import sys, argparse
 import envvars
 from puldap import PuLdap, LDAP_ENV_VARS
 
