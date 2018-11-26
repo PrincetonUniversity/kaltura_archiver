@@ -595,11 +595,11 @@ def _setup(params, doit_prop):
     doit = params[doit_prop] if doit_prop else True
     kaltura.logger.setLevel(params['loglevel'])
 
-    kaltura.logger.info("---")
-    kaltura.logger.info("FUNC  {}".format(params['func']))
+    kaltura.logger.debug("---")
+    kaltura.logger.debug("FUNC  {}".format(params['func']))
     for k in sorted(params.keys()):
         if k != 'func' and params[k] != None:
-            kaltura.logger.info("PARAM %s=%s" % (k, '***' if "SECRET" in k.upper() else params[k]))
+            kaltura.logger.debug("PARAM %s=%s" % (k, '***' if "SECRET" in k.upper() else params[k]))
 
 
     # connect to Kaltura
