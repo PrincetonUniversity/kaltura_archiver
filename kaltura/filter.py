@@ -13,6 +13,7 @@ import api
 
 class Filter:
     MAX_PAGE_SIZE = 500
+    ENTRY_STATUS_READY = KalturaEntryStatus.READY
 
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
         self.filter = KalturaMediaEntryFilter()
@@ -63,6 +64,18 @@ class Filter:
             self.filter.statusIn = str(status)
         else:
             self.filter.statusIn += ",{}".format(status)
+        return self
+
+    def status_not(self, status):
+        """
+        filter on KalturaEntryStatus constant
+        :param status:
+        :return:
+        """
+        if self.filter.statusNotIn == NotImplemented:
+            self.filter.statusNotIn = str(status)
+        else:
+            self.filter.statusNotIn += ",{}".format(status)
         return self
 
     def tag(self, tag):
