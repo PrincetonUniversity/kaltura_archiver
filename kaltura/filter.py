@@ -66,18 +66,6 @@ class Filter:
             self.filter.statusIn += ",{}".format(status)
         return self
 
-    def status_not(self, status):
-        """
-        filter on KalturaEntryStatus constant
-        :param status:
-        :return:
-        """
-        if self.filter.statusNotIn == NotImplemented:
-            self.filter.statusNotIn = str(status)
-        else:
-            self.filter.statusNotIn += ",{}".format(status)
-        return self
-
     def tag(self, tag):
         """
         if tag does not start with '!' match if it (partially) matches kaltura media entry tag
