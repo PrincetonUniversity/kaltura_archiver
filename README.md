@@ -16,7 +16,7 @@ python kaltura_aws.py --help
 ## Archiving Videos Workflow 
 
 Only videos that have not been played recently are archived. 
-Only videos amller than  10000000kb are archived
+Only videos smaller than  10000000kb are archived
  
 
 The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
@@ -25,7 +25,8 @@ The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based
  2. whether video has no lastPlayedAt property 
  3. category id 
  3. tag value 
- 4. entry id 
+ 4. status of entry - eg READY (2), QUEDE (0), ERROR (-1), .. see   KalturaEntryStatus class in KalturaClient.Plugins.Core 
+ 5. entry id 
 
 Critera can be combined, except for selecting by tag and selecting by 'no lastPlayedAt'.
 
@@ -41,18 +42,18 @@ In the initial state:
   1. s3 does not contain a copy of the entry's original flavor 
   2. entry does not have the 'archived_to_s3' tag 
   3. entry does not have the 'deleted_flavors' tag 
-  4. its original flavor is the entrys 'real' video - lets call this the real original flavor
+  4. its original flavor is the entry's 'real' video - lets call this the real original flavor
 
 In the archived state: 
   1. s3 contain a copy of the entry's real original flavor 
   2. entry has  the 'archived_to_s3' tag 
-  3. entry does not have the 'deleted_flavors' tag 
-  4. its original flavor is the real original flavor
+  3. entry does not have the 'deleted_flavors' tag  -- same as initial state
+  4. its original flavor is the real original flavor  -- same as initial state
 
 
 In the  place_holder state: 
-  1. s3 contain a copy of the entry's real original flavor 
-  2. entry has  the 'archived_to_s3' tag 
+  1. s3 contain a copy of the entry's real original flavor -- same as archived state
+  2. entry has  the 'archived_to_s3' tag -- same as archived state
   3. entry has the 'deleted_flavors' tag 
   4. its original flavor is the place holder video 
   
@@ -72,7 +73,7 @@ The kaltura_aws.py subcommands moves entries between states:
 Subcommands print errors if they are applied to entries in a state that they can not work with, 
 for example the place_holder command refuses to work with entries in the initial state. 
 
-In addition kaltura_aws.py has a status subcommand. 
+In addition kaltura_aws.py has a health and count subcommands. 
 
 
 ### kaltura_aws subcommands in pseudo code
@@ -82,7 +83,7 @@ In addition kaltura_aws.py has a status subcommand.
 ~~~
 if entry.original_flavor != None 
 and if entry.original_flavor.status == READY 
-and AWS bucket does not contain a file with the entries id 
+and AWS bucket does not contain a file with the same name as entries id 
    transfer to AWS-s3 bucket 
    apply 'archived_to_s3'  tag to entry
 ~~~
@@ -93,29 +94,28 @@ and AWS bucket does not contain a file with the entries id
 ~~~
 if entry.original_flavor != None 
 and if entry.original_flavor.status == READY 
-and AWS bucket contains a file with the entries id 
+and AWS bucket contains a file with the same name as entries id 
 and that file has the same size as the original flavor
     delete all flavors including original  
     upload place holder video; create new thumbnail;
     apply tag 'flavors_deleted' 
+    wait until entry goes into READY state (sleep in between checks) 
 ~~~
 
-#### status
+#### health
 
 check the following invariant - see kaltura_aws.entry_health_check method
 
 ~~~
-has original flavor in READY status 
+has original flavor and is in READY status 
 if AWS S3 contains a file with the entries ID 
     then the entry has the  'archived_to_s3' tag 
 if the entry does not have the  'archived_to_s3' tag 
     then there is no entry in AWS 
-if the entry dhas the  'flavors_deleted' tag 
+if the entry has the  'flavors_deleted' tag 
     it should also have the 'archived_to_s3' tag
-if the entry dows not have 'flavors_deleted' and has 'archived_to_s3' tag  
+if the entry does not have 'flavors_deleted' and has 'archived_to_s3' tag  
     size of original flavor and size of s3 entry should match  
-if the entry does not have the 'flavors_deleted' tag 
-    then the filesize of the AWS s3 entry matches the ORIGINAL flavors file size
 ~~~
 
 
@@ -124,14 +124,24 @@ if the entry does not have the 'flavors_deleted' tag
 to archive and replace with the place holder video choose a filter option 
 that captures the videos you want to work on, then do: 
 ~~~
-
 kaltura_aws.py  archive  [filter-options]
 kaltura_aws.py  s3copy [filter-options]
-kaltura_aws.py  status [filter-options]
+kaltura_aws.py  health [filter-options]
 ~~~
    
-The status command should list all selected videos in a HEALTHY state and all videos 
+The health command should list all selected videos in a HEALTHY state and all videos 
 should be tagged 'archived_to_s3' and 'flavors_deleted' 
+
+To monitor progress count entries:  
+~~~
+kaltura_aws.py count --tag archived_to_s3  
+kaltura_aws.py count --tag flavors_deleted 
+~~~
+
+To count the number of entry that are not in the READY state  (filter on default ststu list xcept for 2 == READY status) 
+~~~
+./kaltura_aws.py count --status --status 1 -2 0 1 7 4
+~~~
 
 ### Restoring Videos
 
@@ -163,7 +173,7 @@ and if the versioned video has the same size, which is even more unlikely, will 
 ### video list with creator ids and their ldap status ### 
 Use this report to generate a list of videos with information on the creator associated with the entry: 
    1. creators netid 
-   1. active/inactive axcxording to ldap 
+   1. active/inactive according to ldap 
    1. name 
    1. org unit 
    

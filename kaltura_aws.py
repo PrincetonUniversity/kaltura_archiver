@@ -15,7 +15,7 @@ import kaltura.aws as aws
 PLACE_HOLDER_VIDEO = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
 
-DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4"
+DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4".split(",")
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
 
@@ -113,7 +113,7 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
         subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
-        subparser.add_argument("--status",   default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, DEFAULT_STATUS_LIST))
+        subparser.add_argument("--status",   nargs='*', default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, ' '.join(DEFAULT_STATUS_LIST)))
         subparser.add_argument("--played", "-p",  type=int, help="played within the the given number of years")
         subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
         subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
@@ -581,7 +581,7 @@ def _create_filter(params):
             # see ArgParser
             filter.tag(params['tag'])
             filter.category(params['category'])
-            filter.status(params['status'])
+            filter.status(','.join(params['status']))
             filter.years_since_played(params['unplayed']).played_within_years(params['played'])
             if (params['noLastPlayed']) :
                  filter.undefined_LAST_PLAYED_AT()
