@@ -18,6 +18,11 @@ SAVED_TO_S3 = "archived_to_s3"
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4"
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
+
+
+# if waiting for uploaded video'd original flavor to reach READY status   - use leep for POLL_READY_WAIT sec in between checks
+POLL_READY_WAIT = 1
+
 from KalturaClient.Plugins.Core import  KalturaEntryStatus
 
 
@@ -73,6 +78,7 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('restore_from_s3', description="restore matching videos from AWS-s3")
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
+        subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before restoring next video")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=restore_from_s3)
@@ -80,6 +86,7 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
+        subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before replacing next video")
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=replace_videos)
 
@@ -324,8 +331,11 @@ def restore_from_s3(params):
     tmp = params['tmp']
     counts = [0,0,0, 0]
     for entry in filter:
-        rc = restore_entry_from_s3(kaltura.MediaEntry(entry), bucket, tmp, doit)
+        mentry = kaltura.MediaEntry(entry)
+        rc = restore_entry_from_s3(mentry, bucket, tmp, doit)
         counts[rc] += 1
+        if rc == RESTORE_DONE:
+            wait_for_ready(mentry, doit)
 
     kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
     kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
@@ -383,7 +393,6 @@ REPLACE_DONE  = 0
 REPLACE_DONE_BEFORE = 1
 REPLACE_BIG_FILE_SKIP = 2
 REPLACE_FAILED = 3
-REPLACE_INCOMPLETE = 4
 
 def replace_videos(params):
     """
@@ -395,6 +404,7 @@ def replace_videos(params):
     :return:  None
     """
     doit = _setup(params, 'replace')
+    wait = params['wait_ready']
     filter = _create_filter(params)
     if not params['id']:
         if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
@@ -404,39 +414,31 @@ def replace_videos(params):
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
-    counts = [0, 0, 0, 0, 0]
+    counts = [0, 0, 0, 0]
     entries = []
     for entry in filter:
-        rc = replace_entry_video(kaltura.MediaEntry(entry), place_holder, bucket, doit)
-        if (rc == REPLACE_DONE):
-            entries.append(entry)
-        else:
-            counts[rc] += 1
-
-    if (entries):
-        # pause to give Kaltura time to concert the replace ment videos
-        _pause(10 + len(entries) * 3, doit)
-
-        #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
-        good_status = [int(KalturaEntryStatus.READY)]
-        for entry in entries:
-            mentry = kaltura.MediaEntry(entry)
-            mentry.reload()
-            print(mentry.entry.getStatus().value.__class__)
-            print(int(mentry.entry.getStatus().value), good_status)
-            if not (int(mentry.entry.getStatus().value) in good_status):
-                mentry.log_action(logging.ERROR, doit, 'Replace Failed', 'Video status {} not in {}'.format(entry.getStatus().value, good_status))
-                counts[REPLACE_INCOMPLETE] += 1
-            else:
-                counts[REPLACE_DONE] += 1
+        mentry = kaltura.MediaEntry(entry)
+        rc = replace_entry_video(mentry, place_holder, bucket, doit)
+        if wait and (rc == REPLACE_DONE):
+            wait_for_ready(mentry, doit)
+        counts[rc] += 1
 
     kaltura.logger.info("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
-    kaltura.logger.info("# {}: {}".format('REPLACE_INCOMPLETE', counts[REPLACE_INCOMPLETE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
     kaltura.logger.info("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
     return counts[REPLACE_FAILED]
 
+def wait_for_ready(mentry, doit):
+    #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
+    good_status = [int(KalturaEntryStatus.READY)]
+    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY');
+    while (doit):
+        mentry.reload()
+        if (int(mentry.entry.getStatus().value) in good_status):
+            break;
+        mentry.log_action(logging.DEBUG, doit, 'WAIT', 'sleep {}'.format(POLL_READY_WAIT))
+        time.sleep(POLL_READY_WAIT)
 
 def replace_entry_video(mentry, place_holder, bucket, doit):
     """
