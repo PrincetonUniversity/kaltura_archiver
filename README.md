@@ -210,7 +210,7 @@ run on the command line  - you may have to install the [openldap package](http:/
 
 on EC2 server run 'sudo yum install openldap-clients'
 
-Look for 'puresource=a-W iod=monikam uthentication=disabled' ; print only dn property
+Look for 'puresource=authentication=disabled' ; print only dn property
 ~~~
 ldapsearch -LLL -x -H "ldaps://$LDAP_SERVER/" -b "o=Princeton University,c=US" -D "uid=NETID,o=princeton university,c=us" -W 'puresource=authentication=disabled' 1.1
 ~~~
