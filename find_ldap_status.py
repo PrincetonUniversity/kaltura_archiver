@@ -8,12 +8,10 @@ LDAP_QUERY_SPONSOR_PATTERN = 'universityid={}'
 URL_PATTERN =  'https://kmc.kaltura.com/index.php/kmcng/content/entries/entry/{}/metadata'
 
 def _build_ldap_uid_expr(uid):
-    expr =  LDAP_QUERY_UID_PATTERN.format(uid, uid)
-    return expr
+    return LDAP_QUERY_UID_PATTERN.format(uid, uid)
 
 def _build_ldap_sponsor_expr(sponsorid):
-    expr =  LDAP_QUERY_SPONSOR_PATTERN.format(sponsorid)
-    return expr
+    return LDAP_QUERY_SPONSOR_PATTERN.format(sponsorid)
 
 def _ldap_empty_results(fields):
     results = {}
@@ -21,14 +19,22 @@ def _ldap_empty_results(fields):
         results[f] = ''
     return results
 
-def _ldap_get_match(ldap, expr, fields):
-    res_type, res_data, res_msgid, res_controls = next(ldap.all_results_with(expr, fields))
-    results = _ldap_empty_results(fields)
-    data = res_data[0][1]
-    for k in data.keys():
-        results[k] = data[k][0]
-    return results
+def _ldap_has_more(iter):
+    try:
+        next(iter);
+        return True
+    except StopIteration:
+        return False
 
+def _ldap_get_match(ldap, expr, fields):
+    results = _ldap_empty_results(fields)
+    iter = ldap.all_results_with(expr, fields)
+    res_type, res_data, res_msgid, res_controls = next(iter)
+    if (not _ldap_has_more(iter)):
+        data = res_data[0][1]
+        for k in data.keys():
+            results[k] = data[k][0]
+    return results
 
 class AddLdapStatusParser(envvars.ArgumentParser):
 
@@ -80,7 +86,7 @@ def _do_entry(ldap, eid, netid, header, sponsorId = ''):
         try:
             results = _ldap_get_match(ldap, _build_ldap_uid_expr(netid), fields)
             if not results['displayName']:
-                results['displayName'] = results['cn'][0]
+                results['displayName'] = results['cn']
             if results['universityidref'] and results['pustatus'] == '#sv':
                 sponsor = _ldap_get_match(ldap, _build_ldap_sponsor_expr(results['universityidref']), ['uid'])['uid']
                 results['sponsor'] = sponsor
