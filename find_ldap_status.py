@@ -3,12 +3,12 @@ import sys, argparse
 import envvars
 from puldap import PuLdap, LDAP_ENV_VARS
 
-LDAP_QUERY_UID_PATTERN = 'uid={}'
+LDAP_QUERY_UID_PATTERN = '|(campusid={})(uid={})'
 LDAP_QUERY_SPONSOR_PATTERN = 'universityid={}'
 URL_PATTERN =  'https://kmc.kaltura.com/index.php/kmcng/content/entries/entry/{}/metadata'
 
 def _build_ldap_uid_expr(uid):
-    expr =  LDAP_QUERY_UID_PATTERN.format(uid)
+    expr =  LDAP_QUERY_UID_PATTERN.format(uid, uid)
     return expr
 
 def _build_ldap_sponsor_expr(sponsorid):
@@ -59,7 +59,7 @@ def _enhance(tsvin, entryid_col, netid_col, ldap):
     entry_idx = header.index(entryid_col)
     netid_idx = header.index(netid_col)
 
-    print("\t".join([line, 'status', 'puincomingemail', 'pustatus', 'sponsor', 'name', 'org_unit']))
+    header = True
     for line in tsvin.readlines():
         line = line.strip()
         cols = line.split("\t")
@@ -69,19 +69,22 @@ def _enhance(tsvin, entryid_col, netid_col, ldap):
         eid = cols[entry_idx]
         if (netid.find('@') >= 0 ):
             netid = netid[:netid.find('@')]
-        _do_entry(ldap, eid, netid)
+        _do_entry(ldap, eid, netid, header)
+        header = False
 
-def _do_entry(ldap, eid, netid):
+def _do_entry(ldap, eid, netid, header, sponsorId = ''):
         #determine ldap status, name, and org-unit
-        fields = ['universityidref', 'displayName', 'cn', 'ou', 'pustatus', 'puincomingemail']
+        fields = ['universityid', 'pustatus', 'universityidref', 'puincomingemail', 'emailbox', 'emailrewrite', 'displayName', 'cn', 'ou']
+        if (header):
+            print("\t".join(['entryId', 'sponsering', 'netid'] + fields))
         try:
             results = _ldap_get_match(ldap, _build_ldap_uid_expr(netid), fields)
             if not results['displayName']:
                 results['displayName'] = results['cn'][0]
-            if results['universityidref']:
+            if results['universityidref'] and results['pustatus'] == '#sv':
                 sponsor = _ldap_get_match(ldap, _build_ldap_sponsor_expr(results['universityidref']), ['uid'])['uid']
                 results['sponsor'] = sponsor
-                _do_entry(ldap, eid, sponsor)
+                _do_entry(ldap, eid, sponsor, False, results['universityid'])
             results['status'] = 'active'
 
         except StopIteration as e:
@@ -90,7 +93,7 @@ def _do_entry(ldap, eid, netid):
             pass;
         if (not results.has_key('sponsor')):
             results['sponsor'] = ''
-        print("\t".join([eid, netid, results['status'], results['puincomingemail'], results['pustatus'], results['sponsor'], results['displayName'], results['ou']]))
+        print("\t".join([eid, sponsorId, netid] + map(lambda(x) :  results[x]  , fields) ))
 
 if __name__ == '__main__':
     parser = AddLdapStatusParser.create()
