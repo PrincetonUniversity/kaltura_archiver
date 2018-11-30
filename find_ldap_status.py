@@ -80,13 +80,11 @@ def _enhance(tsvin, entryid_col, netid_col, ldap):
 
 def _do_entry(ldap, eid, netid, header, sponsorId = ''):
         #determine ldap status, name, and org-unit
-        fields = ['universityid', 'pustatus', 'universityidref', 'puincomingemail', 'emailbox', 'emailrewrite', 'displayName', 'cn', 'ou']
+        fields = ['universityid', 'pustatus', 'universityidref', 'puincomingemail', 'emailbox', 'emailrewrite', 'cn', 'ou']
         if (header):
             print("\t".join(['entryId', 'sponsering', 'netid'] + fields))
         try:
             results = _ldap_get_match(ldap, _build_ldap_uid_expr(netid), fields)
-            if not results['displayName']:
-                results['displayName'] = results['cn']
             if results['universityidref'] and results['pustatus'] == '#sv':
                 sponsor = _ldap_get_match(ldap, _build_ldap_sponsor_expr(results['universityidref']), ['uid'])['uid']
                 results['sponsor'] = sponsor
