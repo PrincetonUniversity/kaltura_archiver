@@ -5,7 +5,7 @@ import sys
 import time
 
 import boto3
-from argparse import RawDescriptionHelpFormatter
+from argparse import RawDescriptionHelpFormatter, FileType
 import envvars
 
 import kaltura
@@ -64,6 +64,7 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=list)
 
         subparser = subparsers.add_parser('count', description="count matching videos ")
@@ -74,6 +75,7 @@ It  uses the following environment variables
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=copy_to_s3)
 
         subparser = subparsers.add_parser('restore_from_s3', description="restore matching videos from AWS-s3")
@@ -81,6 +83,7 @@ It  uses the following environment variables
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before restoring next video")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=restore_from_s3)
 
         subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
@@ -88,11 +91,13 @@ It  uses the following environment variables
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before replacing next video")
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=replace_videos)
 
         subparser = subparsers.add_parser('download', description="download original for given video ")
         subparser.add_argument("--id", "-i",  required=True, help="kaltura media entry id")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=download)
 
         description = """
@@ -103,12 +108,13 @@ check status of entries, that is check each matching entry for the following:
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('health', description=description)
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=health_check)
 
         return parser
 
     @staticmethod
-    def _add_filter_params(subparser):
+    def _add_filter_params(subparser, ):
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
@@ -186,6 +192,39 @@ class CheckAndLog:
         log_level = logging.DEBUG if (yes) else logging.INFO
         result = '' if (yes) else 'FAILURE - '
         self.mentry.log_action(log_level, True, "Check", '{}{}'.format(result, message))
+
+class IdFileIter:
+    def __init__(self, file):
+        """
+        file must contain kaltura ids / one per line
+        :param file: input file descriptor
+        """
+        self.file = file
+        self.filter = kaltura.Filter()
+
+    def __iter__(self):
+        return self;
+
+    def next(self):
+        # read from file and stop at end of file
+        id = self.file.readline()
+        if (not id):
+            raise StopIteration()
+
+        # skip empty lines
+        id = id.strip()
+        if not id:
+            return self.next()
+
+        # get info from kaltura
+        self.filter.entry_id(id)
+        try:
+            result = next(iter(self.filter))
+            return result
+        except StopIteration:
+            kaltura.logger.warning(("No match for id '{}'".format(id)))
+            return self.next()
+
 
 def aws_compatible_size(o_size, s3_size):
     """
@@ -575,18 +614,20 @@ def list(params):
     return 0
 
 def _create_filter(params):
-    filter = kaltura.Filter().entry_id(params['id'])
-    if 'tag' in params:
-            # implies all the other params are there too
-            # see ArgParser
-            filter.tag(params['tag'])
-            filter.category(params['category'])
-            filter.status(','.join(params['status']))
-            filter.years_since_played(params['unplayed']).played_within_years(params['played'])
-            if (params['noLastPlayed']) :
-                 filter.undefined_LAST_PLAYED_AT()
-            filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries']).created_greater_equal(params['created'])
-    kaltura.logger.info("FILTER {}".format(filter))
+    if ('idfile' in params):
+        filter = IdFileIter(params['idfile'])
+    else:
+        filter = kaltura.Filter().entry_id(params['id'])
+        if 'tag' in params:
+                # implies all the other params are there too
+                # see ArgParser
+                filter.tag(params['tag'])
+                filter.category(params['category'])
+                filter.status(','.join(params['status']))
+                filter.years_since_played(params['unplayed']).played_within_years(params['played'])
+                if (params['noLastPlayed']) :
+                     filter.undefined_LAST_PLAYED_AT()
+                filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries']).created_greater_equal(params['created'])
     kaltura.logger.info("FILTER {}".format(filter))
     return filter
 
