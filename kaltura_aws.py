@@ -446,7 +446,7 @@ def replace_videos(params):
     doit = _setup(params, 'replace')
     wait = params['wait_ready']
     filter = _create_filter(params)
-    if not params['id']:
+    if isinstance(filter, kaltura.Filter) and  not params['id']:
         if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
             filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
             kaltura.logger.info("FILTER ADJUSTED {}".format(filter))
@@ -455,7 +455,6 @@ def replace_videos(params):
     place_holder = params['videoPlaceholder']
 
     counts = [0, 0, 0, 0]
-    entries = []
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = replace_entry_video(mentry, place_holder, bucket, doit)
