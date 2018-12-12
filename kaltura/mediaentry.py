@@ -13,7 +13,7 @@ ENTRY_ID = 'entry_id'
 FLAVOR_ID = 'flavor_id'
 LAST_PLAYED = 'last_played'
 LAST_PLAYED_DATE = 'last_played_date'
-VIEWS = 'views'
+PLAYS = 'plays'
 ORIGINAL = 'original'
 ORIGINAL_STATUS = 'orig_status'
 ORIGINAL_SIZE = 'orig_KB'
@@ -170,8 +170,8 @@ class MediaEntry:
             return "{:>10}".format(api.dateString(self.entry.getCreatedAt()))
         if column == CREATED_AT:
             return "{:>12}".format(self.entry.getCreatedAt())
-        if column == VIEWS:
-            return str(self.entry.getViews())
+        if column == PLAYS:
+            return str(self.entry.getPlays())
         if column == TOTAL_SIZE:
             return "{:>10}".format(self.getTotalSize())
         if column == NAME:

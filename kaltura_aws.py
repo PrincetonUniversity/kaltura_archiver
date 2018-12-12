@@ -590,7 +590,7 @@ def list(params):
     filter = _create_filter(params)
 
     if (params['mode'] == 'video'):
-        columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.VIEWS,
+        columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.PLAYS,
                    kaltura.ENTRY_ID, SAVED_TO_S3, PLACE_HOLDER_VIDEO,
                    kaltura.TOTAL_SIZE, kaltura.ORIGINAL_SIZE, kaltura.ORIGINAL_STATUS,
                    kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID]
@@ -683,3 +683,12 @@ if __name__ == '__main__':
         if (True or not isinstance(e, RuntimeError)):
             traceback.print_exc()
         sys.exit(-1)
+
+
+def __setup_connection_for_debug():
+    params = envvars.to_value(KalturaArgParser.ENV_VARS)
+    print(params)
+    kaltura.api.startSession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
+    filter = _create_filter({'id' : '1_220e167n'})
+    print(filter)
+    return filter
