@@ -613,7 +613,7 @@ def list(params):
     return 0
 
 def _create_filter(params):
-    if (params['idfile']):
+    if ('idfile' in params and params['idfile']):
         filter = IdFileIter(params['idfile'])
     else:
         filter = kaltura.Filter().entry_id(params['id'])
