@@ -1,8 +1,10 @@
 # file for passwords ... are in ./nogit directory 
 nogit
 
-# keep tsv reports in subdir 
-tsv
+# log files
+log
+# adhoc scripts  - notes ...
+adhoc
 
 # python compiled 
 scratch.py 
