@@ -21,7 +21,7 @@ DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4".split(",")
 
 
 # if waiting for uploaded video'd original flavor to reach READY status   - use leep for POLL_READY_WAIT sec in between checks
-POLL_READY_WAIT = 1
+POLL_READY_WAIT = 10
 
 from KalturaClient.Plugins.Core import  KalturaEntryStatus
 
@@ -399,7 +399,10 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
     # we have original and original is READY
 
     if not checker.has_tag(PLACE_HOLDER_VIDEO) and checker.aws_s3_matching_file(bucket):
-        mentry.log_action(logging.INFO, doit, 'Restored Before', 's3 file and original flavor have compatible sizes');
+        if checker.original_ready():
+            mentry.log_action(logging.INFO, doit, 'Restored Before', 's3 file and original flavor have compatible sizes');
+        else:
+            mentry.log_action(logging.WARN, doit, 'Restored Before', 'Original not READY; s3 file and original flavor have compatible sizes');
         return RESTORE_DONE_BEFORE
 
     rc = RESTORE_FAILED
@@ -471,7 +474,7 @@ def replace_videos(params):
 def wait_for_ready(mentry, doit):
     #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
     good_status = [int(KalturaEntryStatus.READY)]
-    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY');
+    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY (POLL interval {}'.format((POLL_READY_WAIT)));
     while (doit):
         mentry.reload()
         if (int(mentry.entry.getStatus().value) in good_status):
