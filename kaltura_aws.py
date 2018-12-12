@@ -64,7 +64,7 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
         KalturaArgParser._add_filter_params(subparser)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=list)
 
         subparser = subparsers.add_parser('count', description="count matching videos ")
@@ -75,7 +75,7 @@ It  uses the following environment variables
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=copy_to_s3)
 
         subparser = subparsers.add_parser('restore_from_s3', description="restore matching videos from AWS-s3")
@@ -83,7 +83,7 @@ It  uses the following environment variables
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before restoring next video")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=restore_from_s3)
 
         subparser = subparsers.add_parser('replace_video', description="delete flavors and replace original with place holder video of matching entries  \
@@ -91,13 +91,13 @@ It  uses the following environment variables
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before replacing next video")
         KalturaArgParser._add_filter_params(subparser)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=replace_videos)
 
         subparser = subparsers.add_parser('download', description="download original for given video ")
         subparser.add_argument("--id", "-i",  required=True, help="kaltura media entry id")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=download)
 
         description = """
@@ -613,7 +613,7 @@ def list(params):
     return 0
 
 def _create_filter(params):
-    if ('idfile' in params):
+    if (params['idfile']):
         filter = IdFileIter(params['idfile'])
     else:
         filter = kaltura.Filter().entry_id(params['id'])
