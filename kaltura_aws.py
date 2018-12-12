@@ -474,7 +474,7 @@ def replace_videos(params):
 def wait_for_ready(mentry, doit):
     #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
     good_status = [int(KalturaEntryStatus.READY)]
-    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY (POLL interval {}'.format((POLL_READY_WAIT)));
+    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY (POLL interval {}sec)'.format((POLL_READY_WAIT)));
     while (doit):
         mentry.reload()
         if (int(mentry.entry.getStatus().value) in good_status):
