@@ -4,6 +4,11 @@ if [ -f /etc/bashrc ]; then
 	. /etc/bashrc
 fi
 
+export PATH="~/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+
 # User specific aliases and functions
 
 #colorize ls 
