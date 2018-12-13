@@ -15,13 +15,16 @@ import kaltura.aws as aws
 PLACE_HOLDER_VIDEO = "flavors_deleted"
 SAVED_TO_S3 = "archived_to_s3"
 
+# do not replace videos created within the last REAPLCE_YEARS
+YEARS_SINCE_CREATION_FOR_REPLACE = 3
+
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4".split(",")
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
 
-
-# if waiting for uploaded video'd original flavor to reach READY status   - use leep for POLL_READY_WAIT sec in between checks
+# if waiting for uploaded video's original flavor to reach READY status   - sleep for POLL_READY_WAIT sec in between checks
 POLL_READY_WAIT = 10
+
 
 from KalturaClient.Plugins.Core import  KalturaEntryStatus
 
@@ -115,19 +118,47 @@ check status of entries, that is check each matching entry for the following:
 
     @staticmethod
     def _add_filter_params(subparser, ):
-        subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
-        subparser.add_argument("--id", "-i",  help="kaltura media entry id")
-        subparser.add_argument("--unplayed", "-u",  type=int, help="unplayed for given number of years")
+        subparser.add_argument("--category", "-c",  help="kaltura category")
+        subparser.add_argument("--plays",  help="number of video plays")
         subparser.add_argument("--status",   nargs='*', default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, ' '.join(DEFAULT_STATUS_LIST)))
-        subparser.add_argument("--played", "-p",  type=int, help="played within the the given number of years")
-        subparser.add_argument("--noLastPlayed", "-n",  action="store_true", default=False, help="undefined LAST_PLAYED_AT attribute")
+
+        subparser.add_argument("--created_within",  type=int, help="creation date lies within the given number years");
+        subparser.add_argument("--created_before",   type=int, help="creation date longer than the given number of years ago");
+        subparser.add_argument("--played_within", "-p",  type=int, help="played within the the given number of years")
+        subparser.add_argument("--unplayed_for", "-u",  type=int, help="unplayed for given number of years")
+
         subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
         subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
                                help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
         subparser.add_argument("--max_entries", "-M",  type=int, default=-1, help="maximum number of entries to work on  - default unlimited")
-        subparser.add_argument("--created", "-C",  type=int, help="creation time greater or equal given int (sec since UNIX)")
+
+        subparser.add_argument("--id", "-i",  help="kaltura media entry id")
+
         return None
+
+def _create_filter(params):
+    if ('idfile' in params and params['idfile']):
+        filter = IdFileIter(params['idfile'])
+    else:
+        filter = kaltura.Filter().entry_id(params['id'])
+        if 'tag' in params:
+            # implies all the other params are there too
+            # see ArgParser
+            filter.tag(params['tag'])
+            filter.category(params['category'])
+            filter.status(','.join(params['status'])).plays_equal(params['plays'])
+            filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
+            filter.created_wthin_years(params['created_within']).years_since_created(params['created_before'])
+            filter.first_page(params['first_page']).page_size(params['page_size'])
+            filter.max_iter(params['max_entries'])
+        if (params['func'] == replace_videos):
+            if (not 'created_before' in params or params['created_before'] < YEARS_SINCE_CREATION_FOR_REPLACE):
+                kaltura.logger.info("Adding years_since_ccreate = {} years   to filter".format(YEARS_SINCE_CREATION_FOR_REPLACE))
+                filter.years_since_created(YEARS_SINCE_CREATION_FOR_REPLACE)
+
+    kaltura.logger.info("FILTER {}".format(filter))
+    return filter
 
 
 class CheckAndLog:
@@ -449,11 +480,6 @@ def replace_videos(params):
     doit = _setup(params, 'replace')
     wait = params['wait_ready']
     filter = _create_filter(params)
-    if isinstance(filter, kaltura.Filter) and  not params['id']:
-        if (not params['noLastPlayed'] and not params['unplayed'] ) or (params['unplayed']  and params['unplayed'] < REPLACE_ONLY_IF_YEARS_SINCE_PLAYED):
-            filter.years_since_played(REPLACE_ONLY_IF_YEARS_SINCE_PLAYED)
-            kaltura.logger.info("FILTER ADJUSTED {}".format(filter))
-
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
@@ -614,24 +640,6 @@ def list(params):
                 vals = [kf.report_str(c) for c in columns]
                 print("\t".join(v.decode('utf-8') for v in vals))
     return 0
-
-def _create_filter(params):
-    if ('idfile' in params and params['idfile']):
-        filter = IdFileIter(params['idfile'])
-    else:
-        filter = kaltura.Filter().entry_id(params['id'])
-        if 'tag' in params:
-                # implies all the other params are there too
-                # see ArgParser
-                filter.tag(params['tag'])
-                filter.category(params['category'])
-                filter.status(','.join(params['status']))
-                filter.years_since_played(params['unplayed']).played_within_years(params['played'])
-                if (params['noLastPlayed']) :
-                     filter.undefined_LAST_PLAYED_AT()
-                filter.first_page(params['first_page']).page_size(params['page_size']).max_iter(params['max_entries']).created_greater_equal(params['created'])
-    kaltura.logger.info("FILTER {}".format(filter))
-    return filter
 
 def _setup(params, doit_prop):
     doit = params[doit_prop] if doit_prop else True
