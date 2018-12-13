@@ -410,7 +410,7 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
         # see whether we can get the S3 file - might still be in glacier
         if aws.s3_restore(s3_file, bucket, doit):
             # download from S3
-            to_file = aws.s3_download("{}/{}.s3".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
+            to_file = aws.s3_download("{}/{}".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
 
             # delete all flavors
             if mentry.deleteFlavors(doDelete=doit):
