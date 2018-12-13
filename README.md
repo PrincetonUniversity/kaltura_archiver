@@ -22,13 +22,14 @@ Only videos smaller than  10000000kb are archived
 The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
 
  1. number of years since placed
- 2. whether video has no lastPlayedAt property 
+ 2. whethertion date   
  3. category id 
  3. tag value 
+ 3. the number of times the video was played 
  4. status of entry - eg READY (2), QUEDE (0), ERROR (-1), .. see   KalturaEntryStatus class in KalturaClient.Plugins.Core 
  5. entry id 
 
-Critera can be combined, except for selecting by tag and selecting by 'no lastPlayedAt'.
+Most critera can be combined.
 
 All actions that trigger changes, like archiving videos in s3 or replacing with the place holder video are 
 perfomed in dryRun mode by default. 
@@ -124,23 +125,32 @@ if the entry does not have 'flavors_deleted' and has 'archived_to_s3' tag
 to archive and replace with the place holder video choose a filter option 
 that captures the videos you want to work on, then do: 
 ~~~
-kaltura_aws.py  archive  [filter-options]
-kaltura_aws.py  s3copy [filter-options]
+kaltura_aws.py  s3copy   [fiOlter-options]
+kaltura_aws.py  replace_video [filter-options]
 kaltura_aws.py  health [filter-options]
 ~~~
    
 The health command should list all selected videos in a HEALTHY state and all videos 
 should be tagged 'archived_to_s3' and 'flavors_deleted' 
 
-To monitor progress count entries:  
+To count matchig videos
 ~~~
+#entries with archived_to_s3
 kaltura_aws.py count --tag archived_to_s3  
-kaltura_aws.py count --tag flavors_deleted 
+#entries without archived_to_s3
+kaltura_aws.py count --tag !archived_to_s3  
+
+# entries that were played between 2-3 years ago 
+kaltura_aws.py count --played_within 3 --unplayed_for 2
+
+# entries that are not in the READY state
+./kaltura_aws.py count --status --status 1 -2 0 1 7 4
 ~~~
 
-To count the number of entry that are not in the READY state  (filter on default ststu list xcept for 2 == READY status) 
+
+To list videos that were created 3-4 years ago but never plyed: 
 ~~~
-./kaltura_aws.py count --status --status 1 -2 0 1 7 4
+python kaltura_aws.py list --created_before 3 --created_within 4 --plays 0
 ~~~
 
 ### Restoring Videos
