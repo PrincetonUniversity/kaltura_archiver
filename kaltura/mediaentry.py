@@ -207,7 +207,7 @@ class Flavor:
         self.flavor = flavor
 
     def isReady(self):
-        return self.flavor.getStatus().value == KalturaFlavorAssetStatus.READY
+        return self.flavor.getStatus().getValue() == KalturaFlavorAssetStatus.READY
 
     def delete(self, doDelete):
         self.log_action(logging.INFO, doDelete, "Delete", "")
