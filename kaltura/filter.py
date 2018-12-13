@@ -93,25 +93,17 @@ class Filter:
             tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
             self.filter.advancedSearch = tagfilter
             api.logger.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
-        else:
-            api.logger.debug("Filter.tag: NONE" )
         return self
 
-    def undefined_LAST_PLAYED_AT(self):
-        """
-        matches videos that do not have a lastPlayedAt property
-
-        not compatible wih tag method
-
-        :return: self
-        """
-        if (self.filter.advancedSearch != NotImplemented):
-            raise RuntimeError("undefined_LAST_PLAYED_AT: filter.advancedSearch already defined")
-        self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-        self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.LAST_PLAYED_AT
-        self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.LESS_THAN
-        self.filter.advancedSearch.value = Filter._years_ago(20)
-        api.logger.debug("Filter.undefined_LAST_PLAYED_AT last >= {}".format(api.dateString(self.filter.advancedSearch.value)) )
+    def plays_equal(self, plays):
+        if (plays != None):
+            if (self.filter.advancedSearch != NotImplemented):
+                raise RuntimeError("playsEqual: filter.advancedSearch already defined")
+            self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
+            self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.PLAYS
+            self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.EQUAL
+            self.filter.advancedSearch.value = plays
+            api.logger.debug("Filter.playsEqual== {}".format(plays))
         return self
 
     def category(self, categoryId):
@@ -126,8 +118,6 @@ class Filter:
         if (categoryId != None):
             self.filter.categoryAncestorIdIn = categoryId
             api.logger.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
-        else:
-            api.logger.debug("Filter.category: NOOP")
         return self
 
     def years_since_played(self, years):
@@ -136,9 +126,15 @@ class Filter:
     def played_within_years(self, years):
         return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
 
-    def created_greater_equal(self, gm_time):
-        if (gm_time != None):
-            self.filter.createdAtGreaterThanOrEqual = gm_time
+    def years_since_created(self, years):
+        if (years != None):
+            self.filter.createdAtLessThanOrEqual = Filter._years_ago(years)
+        return self
+
+    def created_wthin_years(self, years):
+        if (years != None):
+            self.filter.createdAtGreaterThanOrEqual = Filter._years_ago(years)
+        return self
 
     def get_count(self):
         """
