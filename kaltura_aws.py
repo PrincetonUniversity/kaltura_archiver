@@ -474,10 +474,10 @@ def replace_videos(params):
 def wait_for_ready(mentry, doit):
     #good_status = [KalturaEntryStatus.READY, KalturaEntryStatus.PRECONVERT]
     good_status = [int(KalturaEntryStatus.READY)]
-    mentry.log_action(logging.INFO, doit, 'WAIT', 'Waiting for original flavor status to be READY (POLL interval {}sec)'.format((POLL_READY_WAIT)));
+    mentry.log_action(logging.INFO, doit, 'WAIT', 'For original flavor status to be {} (POLL interval {}sec)'.format(good_status, POLL_READY_WAIT));
     while (doit):
-        mentry.reload()
-        if (int(mentry.entry.getStatus().value) in good_status):
+        orig = kaltura.Flavor(mentry.getOriginalFlavor())
+        if orig and orig.isReady():
             break;
         mentry.log_action(logging.DEBUG, doit, 'WAIT', 'sleep {}'.format(POLL_READY_WAIT))
         time.sleep(POLL_READY_WAIT)
@@ -689,9 +689,9 @@ if __name__ == '__main__':
 
 
 def __setup_connection_for_debug():
+    _init_loggers()
+    logging.root.setLevel(logging.INFO)
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
-    print(params)
+    print("P", params)
+    kaltura.logger.setLevel('DEBUG')
     kaltura.api.startSession(partner_id=params['partnerId'], user_id=params['userId'], secret=params['secret'])
-    filter = _create_filter({'id' : '1_220e167n'})
-    print(filter)
-    return filter
