@@ -66,10 +66,10 @@ def s3_restore(filename, bucketname, doit=False):
 
     try:
         obj = _s3.Object(bucketname, filename)
-
+        s3_path = "s3://{}/{}".format(bucketname, filename)
         if obj.storage_class == 'GLACIER':
             if str(obj.restore).startswith('ongoing-request="false"'):
-                api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Request Restore", "storage-class={}".format(obj.storage_class))
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Request Restore", "storage-class={} path {}".format(obj.storage_class,s3_path))
                 if doit:
                     bucket = _s3.Bucket(bucketname)
                     bucket.meta.client.restore_object(
@@ -79,14 +79,14 @@ def s3_restore(filename, bucketname, doit=False):
                                         'GlacierJobParameters': {'Tier': 'Bulk'}}
                     )
             else:
-                api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Restoring", "obj.restore={}".format(obj.restore))
+                api.log_action(logging.INFO, doit, "AWS-S3", filename,  "Restoring", "obj.restore={} path {}".format(obj.restore, s3_path))
         elif (obj.storage_class == None):
-            api.log_action(logging.INFO, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Available", "")
+            api.log_action(logging.INFO, doit, "AWS-S3", filename, "Available", s3_path)
             return True
         else:
-            api.log_action(logging.ERROR, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Unknown class", "obj.restore={}".format(obj.restore))
+            api.log_action(logging.ERROR, doit, "AWS-S3", filename, "Unknown Storage class", "obj.restore={}: {}".format(obj.restore, s3_path))
     except botocore.exceptions.ClientError as e:
-        api.log_action(logging.ERROR, doit, "AWS-S3", "{}/{}".format(bucketname, filename), "Access Error", e)
+        api.log_action(logging.ERROR, doit, "AWS-S3", filename,  "Access Error", "{} path {}".format(e, s3_path))
 
     return False
 
