@@ -620,7 +620,7 @@ def list(params):
 
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.PLAYS,
-                   kaltura.ENTRY_ID, SAVED_TO_S3, PLACE_HOLDER_VIDEO,
+                   kaltura.ENTRY_ID, kaltura.STATUS,  SAVED_TO_S3, PLACE_HOLDER_VIDEO,
                    kaltura.TOTAL_SIZE, kaltura.ORIGINAL_SIZE, kaltura.ORIGINAL_STATUS,
                    kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID]
         print('\t'.join(columns))

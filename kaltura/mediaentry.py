@@ -7,7 +7,7 @@ import logging
 import urllib
 import os
 
-from KalturaClient.Plugins.Core import KalturaMediaEntry, KalturaFlavorAsset, KalturaUploadToken, KalturaUploadedFileTokenResource, KalturaFlavorAssetStatus
+from KalturaClient.Plugins.Core import *
 
 ENTRY_ID = 'entry_id'
 FLAVOR_ID = 'flavor_id'
@@ -171,11 +171,13 @@ class MediaEntry:
         if column == CREATED_AT:
             return "{:>12}".format(self.entry.getCreatedAt())
         if column == PLAYS:
-            return str(self.entry.getPlays())
+            return "{:>3}".format(self.entry.getPlays())
         if column == TOTAL_SIZE:
             return "{:>10}".format(self.getTotalSize())
         if column == NAME:
             return self.entry.getName().encode('utf-8')
+        if column == STATUS:
+            return "{:>10}".format(MediaEntry.entry_status_str(self.entry.getStatus().getValue()))
         if column == TAGS:
             return self.entry.getTags().encode('utf-8')
         if column == CATEGORIES:
@@ -194,6 +196,33 @@ class MediaEntry:
 
         has_tag = column in self.entry.getTags()
         return column if has_tag else ''.ljust(len(column))
+
+    @staticmethod
+    def entry_status_str(status):
+        if status == KalturaEntryStatus.ERROR_CONVERTING:
+            return 'ERROR_CONVERTING';
+        if status == KalturaEntryStatus.ERROR_IMPORTING:
+            return 'ERROR_IMPORTING';
+        if status == KalturaEntryStatus.SCAN_FAILURE:
+            return 'SCAN_FAILURE';
+        if status == KalturaEntryStatus.INFECTED:
+            return 'INFECTED';
+        if status == KalturaEntryStatus.READY:
+            return 'READY';
+        if status == KalturaEntryStatus.PENDING:
+            return 'PENDING';
+        if status == KalturaEntryStatus.IMPORT:
+            return 'IMPORT';
+        if status == KalturaEntryStatus.NO_CONTENT:
+            return 'NO_CONTENT';
+        if status == KalturaEntryStatus.MODERATE:
+            return 'MODERATE';
+        if status == KalturaEntryStatus.PRECONVERT:
+            return 'PRECONVERT';
+        if status == KalturaEntryStatus.DELETED:
+            return 'DELETED';
+        if status == KalturaEntryStatus.BLOCKED:
+            return 'BLOCKED';
 
 
     def log_action(self, log_level, doIt, action, message):
