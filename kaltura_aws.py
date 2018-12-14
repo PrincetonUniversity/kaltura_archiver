@@ -438,11 +438,10 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
 
     rc = RESTORE_FAILED
     if checker.has_tag(PLACE_HOLDER_VIDEO):
-        # see whether we can get the S3 file - might still be in glacier
-        if aws.s3_restore(s3_file, bucket, doit):
-            # download from S3
-            to_file = aws.s3_download("{}/{}".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
-
+        # first try to download
+        to_file = aws.s3_download("{}/{}".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
+        if (to_file):
+            # got file - let's restore
             # delete all flavors
             if mentry.deleteFlavors(doDelete=doit):
                 # replace with original from s3
@@ -454,6 +453,8 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
             if (doit):
                 os.remove(to_file)
         else:
+            # tell GLACIER to restore
+            aws.s3_restore(s3_file, bucket, doit)
             mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
             rc = RESTORE_WAIT_GLACIER
 
