@@ -1,7 +1,7 @@
 import logging
 import boto3
 import botocore
-
+from botocore.exceptions import ClientError
 import api
 
 _s3 = boto3.resource('s3')
@@ -15,7 +15,7 @@ def s3_exists(filename, bucketname):
     try:
         _s3.Object(bucketname, filename).load()
         return True
-    except botocore.exceptions.ClientError as e:
+    except ClientError as e:
         api.logger.debug("s3_object_exists({}, {}): {}".format(bucketname, filename, e))
         return False
 
@@ -28,21 +28,32 @@ def s3_size(filename, bucketname):
     try:
         o = _s3.Object(bucketname, filename)
         return o.content_length
-    except botocore.exceptions.ClientError as e:
+    except ClientError as e:
         api.logger.debug("s3_object_size({}, {}): {}".format(bucketname, filename, e))
         return -1
 
 def s3_store(src_file, bucketname, bucketfile, doit=False):
+    """
+    upload src_file to s3://bucketname/bucketfile
+    :param src_file:  name of local file
+    :param bucketname:   name of bucket
+    :param bucketfile:  bucket key
+    :param doit: if false - simply trace
+    :return:
+    """
     if (doit):
         _s3.meta.client.upload_file(src_file, bucketname, bucketfile)
     api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Upload", "to s3://{}/{} from {}".format(bucketname,  bucketfile, src_file))
     return None
 
 def s3_download(to_file, bucketname, bucketfile, doit=False):
-    if (doit):
-        _s3.meta.client.download_file(bucketname, bucketfile, to_file)
-    api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Download", "s3://{}/{} to {}".format(bucketname,  bucketfile, to_file))
-    return to_file
+    try:
+        if (doit):
+            _s3.meta.client.download_file(bucketname, bucketfile, to_file)
+        api.log_action(logging.INFO, doit, "AWS-S3",  "{}".format(bucketfile), "Download", "s3://{}/{} to {}".format(bucketname,  bucketfile, to_file))
+        return to_file
+    except ClientError as e:
+        return None
 
 def s3_delete(bucketname, bucketfile, doit=False):
     if (doit):
@@ -52,7 +63,9 @@ def s3_delete(bucketname, bucketfile, doit=False):
 
 def s3_restore(filename, bucketname, doit=False):
     """
-    if file's storage indicates that it is in GLACUER issue a restore request unless there is a request already underway
+    try to download - if that fails reqeust restore from GLACIER 
+    
+    if file's storage indicates that it is in GLACIER issue a restore request unless there is a request already underway
 
      - calling this method for the first time issues a restore request if necessary
      - on following calls it will simply return false
@@ -67,9 +80,10 @@ def s3_restore(filename, bucketname, doit=False):
     try:
         obj = _s3.Object(bucketname, filename)
         s3_path = "s3://{}/{}".format(bucketname, filename)
+        api.log_action(logging.INFO, doit, "AWS-S3", filename, "Status", "class={} restore={} path {}".format(obj.storage_class, obj.restore, s3_path))
         if obj.storage_class == 'GLACIER':
-            if str(obj.restore).startswith('ongoing-request="false"'):
-                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Request Restore", "storage-class={} path {}".format(obj.storage_class,s3_path))
+            if not str(obj.restore).startswith('ongoing-request="true"'):
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "New Request", "path {}".format(obj.restore, s3_path))
                 if doit:
                     bucket = _s3.Bucket(bucketname)
                     bucket.meta.client.restore_object(
@@ -79,14 +93,14 @@ def s3_restore(filename, bucketname, doit=False):
                                         'GlacierJobParameters': {'Tier': 'Bulk'}}
                     )
             else:
-                api.log_action(logging.INFO, doit, "AWS-S3", filename,  "Restoring", "obj.restore={} path {}".format(obj.restore, s3_path))
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Request Ongoing", "path {}".format(s3_path))
         elif (obj.storage_class == None):
             api.log_action(logging.INFO, doit, "AWS-S3", filename, "Available", s3_path)
             return True
         else:
             api.log_action(logging.ERROR, doit, "AWS-S3", filename, "Unknown Storage class", "obj.restore={}: {}".format(obj.restore, s3_path))
-    except botocore.exceptions.ClientError as e:
-        api.log_action(logging.ERROR, doit, "AWS-S3", filename,  "Access Error", "{} path {}".format(e, s3_path))
+    except ClientError as e:
+        api.log_action(logging.ERROR, doit, "AWS-S3", filename, "Access Error", "{} path {}".format(e, s3_path))
 
     return False
 
