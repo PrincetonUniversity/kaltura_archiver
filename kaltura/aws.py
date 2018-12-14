@@ -83,7 +83,7 @@ def s3_restore(filename, bucketname, doit=False):
         api.log_action(logging.INFO, doit, "AWS-S3", filename, "Status", "class={} restore={} path {}".format(obj.storage_class, obj.restore, s3_path))
         if obj.storage_class == 'GLACIER':
             if not str(obj.restore).startswith('ongoing-request="true"'):
-                api.log_action(logging.INFO, doit, "AWS-S3", filename, "New Request", "path {}".format(obj.restore, s3_path))
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "New Request", "path {}".format(s3_path))
                 if doit:
                     bucket = _s3.Bucket(bucketname)
                     bucket.meta.client.restore_object(
