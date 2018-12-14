@@ -63,8 +63,6 @@ def s3_delete(bucketname, bucketfile, doit=False):
 
 def s3_restore(filename, bucketname, doit=False):
     """
-    try to download - if that fails reqeust restore from GLACIER 
-    
     if file's storage indicates that it is in GLACIER issue a restore request unless there is a request already underway
 
      - calling this method for the first time issues a restore request if necessary
@@ -82,8 +80,8 @@ def s3_restore(filename, bucketname, doit=False):
         s3_path = "s3://{}/{}".format(bucketname, filename)
         api.log_action(logging.INFO, doit, "AWS-S3", filename, "Status", "class={} restore={} path {}".format(obj.storage_class, obj.restore, s3_path))
         if obj.storage_class == 'GLACIER':
-            if not str(obj.restore).startswith('ongoing-request="true"'):
-                api.log_action(logging.INFO, doit, "AWS-S3", filename, "New Request", "path {}".format(s3_path))
+             if obj.restore is None:
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Request Restore", "path {}".format(s3_path))
                 if doit:
                     bucket = _s3.Bucket(bucketname)
                     bucket.meta.client.restore_object(
@@ -92,15 +90,15 @@ def s3_restore(filename, bucketname, doit=False):
                         RestoreRequest={'Days': 2,
                                         'GlacierJobParameters': {'Tier': 'Bulk'}}
                     )
-            else:
-                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Request Ongoing", "path {}".format(s3_path))
-        elif (obj.storage_class == None):
-            api.log_action(logging.INFO, doit, "AWS-S3", filename, "Available", s3_path)
-            return True
+                return False
+             elif obj.restore.startswith('ongoing-request="false"'):
+                api.log_action(logging.INFO, doit, "AWS-S3", filename, "Ready", "path {}".format(s3_path))
+                return True
         else:
-            api.log_action(logging.ERROR, doit, "AWS-S3", filename, "Unknown Storage class", "obj.restore={}: {}".format(obj.restore, s3_path))
+            # if its not in GLACIER - no need to restore
+            api.log_action(logging.ERROR, doit, "AWS-S3", filename, "No-GLACIER", "class={} restore={} path {}".format(obj.storage_class, obj.restore, s3_path))
+            return True
     except ClientError as e:
         api.log_action(logging.ERROR, doit, "AWS-S3", filename, "Access Error", "{} path {}".format(e, s3_path))
 
     return False
-
