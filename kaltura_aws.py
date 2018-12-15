@@ -111,7 +111,7 @@ check status of entries, that is check each matching entry for the following:
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('health', description=description)
         KalturaArgParser._add_filter_params(subparser)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=True, help="file with kaltura ids, one per line")
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=health_check)
 
         return parser
