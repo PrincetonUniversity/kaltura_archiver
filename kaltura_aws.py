@@ -68,6 +68,7 @@ It  uses the following environment variables
         subparser.add_argument("--repair", action="store_true", default=False, help="performs in dryrun mode, unless repair param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
         KalturaArgParser._add_filter_params(subparser)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=repair)
 
         subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
@@ -473,7 +474,7 @@ def restore_from_s3(params):
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
-    counts = [0,0,0, 0]
+    counts = [0,0,0, 0, 0]
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = restore_entry_from_s3(mentry, bucket, tmp, doit)
