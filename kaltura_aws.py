@@ -74,6 +74,12 @@ It  uses the following environment variables
         KalturaArgParser._add_filter_params(subparser)
         subparser.set_defaults(func=count)
 
+        subparser = subparsers.add_parser('repair', description="repair matching videos - look at tags and replace original flavor as tags indicate ")
+        subparser.add_argument("--repair", action="store_true", default=False, help="performs in dryrun mode, unless repair param is given")
+        subparser.add_argument("--tmp", default=".", help="directory for temporary files")
+        KalturaArgParser._add_filter_params(subparser)
+        subparser.set_defaults(func=repair)
+
         subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
@@ -117,7 +123,7 @@ check status of entries, that is check each matching entry for the following:
         return parser
 
     @staticmethod
-    def _add_filter_params(subparser, ):
+    def _add_filter_params(subparser):
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--plays",  help="number of video plays")
@@ -141,8 +147,10 @@ def _create_filter(params):
     if ('idfile' in params and params['idfile']):
         filter = IdFileIter(params['idfile'])
     else:
-        filter = kaltura.Filter().entry_id(params['id'])
-        if 'tag' in params:
+        filter = kaltura.Filter()
+        if ('id' in params):
+            filter.entry_id(params['id'])
+        if 'status' in params:
             # implies all the other params are there too
             # see ArgParser
             filter.tag(params['tag'])
@@ -203,13 +211,15 @@ class CheckAndLog:
             self.s3_size = aws.s3_size(self.entry.getId(), bucket)
         return self.s3_size
 
+    def aws_s3_exists(self, bucket):
+        message = 'Exists s3://{}/{})'.format(bucket, self.entry.getId())
+        yes = (aws.s3_exists(self.entry.getId(), bucket))
+        self._log_action(yes, message)
+        return yes
+
     def aws_s3_matching_file(self, bucket):
-        if (aws.s3_exists(self.entry.getId(), bucket)):
-            yes = aws_compatible_size(self.original.getSize(), self._s3_size(bucket))
-            message = 'Size-Match (s3://{}/{}) = {}  - Original Flavor Size - {} kb'.format(bucket, self.entry.getId(), self._s3_size(bucket), self.original.getSize())
-        else:
-            message = 'Exists (s3://{}/{})'.format(bucket, self.entry.getId())
-            yes = False
+        yes = self.aws_s3_exists(bucket) and aws_compatible_size(self.original.getSize(), self._s3_size(bucket))
+        message = 'Size-Match (s3://{}/{}) = {}  - Original Flavor Size - {} kb'.format(bucket, self.entry.getId(), self._s3_size(bucket), self.original.getSize())
         self._log_action(yes, message)
         return yes
 
@@ -361,6 +371,59 @@ def copy_to_s3(params):
 
     return nerror
 
+def repair(params):
+    """
+    repair entries that do not have original flavors
+
+    depending on tags replace with place_holder video or with video from s3
+
+    :param params: hash that contains kaltura connetion information as well as filtering options given to download action
+    """
+    doit = _setup(params, 'repair')
+    filter = _create_filter(params)
+    tmp = params['tmp']
+    bucket = params['awsBucket']
+    tmp = params['tmp']
+    place_holder = params['videoPlaceholder']
+    counts = [0,0,0, 0, 0]
+    for entry in filter:
+        mentry = kaltura.MediaEntry(entry)
+        checker = CheckAndLog(mentry)
+        rc = RESTORE_UNDEFINED
+
+        healthy, reason = entry_health_check(mentry, bucket)
+        if (healthy):
+            rc = RESTORE_DONE_BEFORE;
+            mentry.log_action(logging.INFO, doit, 'Repair', 'No Need: ' + reason);
+        else:
+            mentry.log_action(logging.INFO, doit, 'Repair', 'Sick Entry:  {} tags={}'.format(reason, entry.getTags()))
+            if not (checker.has_tag(SAVED_TO_S3) and checker.aws_s3_exists(bucket) and checker.aws_s3_below_size_limit(bucket)):
+                mentry.log_action(logging.ERROR, doit, 'Repair', 'Sick Entry: Do not know how to repair');
+            else:
+                if (checker.has_tag(PLACE_HOLDER_VIDEO)):
+                    filename = place_holder;
+                else:
+                    # replace with original from s3
+                    s3_file = mentry.entry.getId()
+                    filename = aws.s3_download("{}/{}".format(tmp, mentry.entry.getId()), bucket, s3_file, doit)
+                    if (not filename):
+                        # tell GLACIER to restore
+                        aws.s3_restore(s3_file, bucket, doit)
+                        mentry.log_action(logging.INFO, doit, 'Restore', 'Waiting for s3 file to come out of Glacier');
+                        rc = RESTORE_WAIT_GLACIER
+
+                if (filename is not None):
+                    rc = REPLACE_FAILED;
+                    if mentry.deleteFlavors(doDelete=doit):
+                        if (mentry.replaceOriginal(filename, doReplace=doit)):
+                            rc = RESTORE_DONE;
+                            wait_for_ready(mentry, doit)
+
+    counts[rc] += 1
+    _log_restore_counts(counts)
+    return counts[RESTORE_DONE]
+
+
 def download(params):
     """
     save original flavors of first matching record to a local file
@@ -381,11 +444,19 @@ def download(params):
     else:
         return 1
 
-
+RESTORE_UNDEFINED = 4
 RESTORE_DONE = 0
 RESTORE_DONE_BEFORE = 1
 RESTORE_WAIT_GLACIER = 2
 RESTORE_FAILED = 3
+
+def _log_restore_counts(counts):
+    if (counts[RESTORE_UNDEFINED] > 0):
+        kaltura.logger.info("# {}: {}".format('RESTORE_UNDEFINED', counts[RESTORE_UNDEFINED]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_DONE_BEFORE', counts[RESTORE_DONE_BEFORE]) )
+    kaltura.logger.info("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
 
 def restore_from_s3(params):
     """
@@ -396,6 +467,7 @@ def restore_from_s3(params):
     :param params: hash that contains kaltura connection information as well as filtering options given for the restore action
     :return:  number of failures
     """
+    doit = _setup(params, 'restore')
     doit = _setup(params, 'restore')
     filter = _create_filter(params)
     bucket = params['awsBucket']
@@ -408,10 +480,7 @@ def restore_from_s3(params):
         if rc == RESTORE_DONE:
             wait_for_ready(mentry, doit)
 
-    kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_DONE_BEFORE', counts[RESTORE_DONE_BEFORE]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
+    _log_restore_counts(cunts)
     return counts[RESTORE_FAILED]
 
 
@@ -419,7 +488,7 @@ def restore_entry_from_s3(mentry, bucket, tmp, doit):
     checker = CheckAndLog(mentry)
     s3_file = mentry.entry.getId()
 
-    if (not aws.s3_exists(s3_file, bucket)):
+    if not checker.aws_s3_exists(bucket):
         mentry.log_action(logging.ERROR, doit, 'Restore Failed', 'No s3 file');
         return RESTORE_FAILED
     # we have s3 file
