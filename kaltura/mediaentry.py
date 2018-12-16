@@ -119,28 +119,25 @@ class MediaEntry:
         """
         self.log_action(logging.INFO, doReplace, 'Replace Orig', "with '{}'".format(filepath))
         if (doReplace):
+            uploadToken = KalturaUploadToken()
+            client = api.getClient()
+            uploadToken = client.uploadToken.add(uploadToken)
+            ulfile = file(filepath)
             try:
-                uploadToken = KalturaUploadToken()
-                client = api.getClient()
-                uploadToken = client.uploadToken.add(uploadToken)
-                ulfile = file(filepath)
                 client.uploadToken.upload(uploadToken.id, ulfile)
                 uploadedFileTokenResource = KalturaUploadedFileTokenResource()
                 uploadedFileTokenResource.token = uploadToken.id
                 client.media.addContent(self.entry.getId(), uploadedFileTokenResource)
-            except KalturaException as e:
-                self.log_action(logging.ERROR, doReplace, "Replace Orig", 'Could not upload original {}'.format(e))
+            except Exception as e:
+                self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
                 return False
-
             try:
                 client.media.updateThumbnail(self.entry.getId(), 1)
             except KalturaException as e:
                 self.log_action(logging.ERROR, doReplace, 'Replace Orig',
                                 'Could not replace thumbnail {}'.format(e))
-                return False
-
+            return False
         return True
-
 
     def addTag(self, newtag, doUpdate=False):
         """
