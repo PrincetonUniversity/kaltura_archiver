@@ -137,7 +137,7 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
         subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
                                help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
-        subparser.add_argument("--max_entries", "-M",  type=int, default=-1, help="maximum number of entries to work on  - default unlimited")
+        subparser.add_argument("--max_entries", "-M",  type=int, default=25, help="maximum number of entries to work on  - default 25, -1 means unlimited")
 
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
 
