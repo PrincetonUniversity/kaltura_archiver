@@ -6,6 +6,7 @@ except Exception as e:
 import logging
 import urllib
 import os
+import  traceback
 
 from KalturaClient.Plugins.Core import *
 
@@ -118,26 +119,21 @@ class MediaEntry:
         :return:
         """
         self.log_action(logging.INFO, doReplace, 'Replace Orig', "with '{}'".format(filepath))
-        if (doReplace):
-            uploadToken = KalturaUploadToken()
-            client = api.getClient()
-            uploadToken = client.uploadToken.add(uploadToken)
-            ulfile = file(filepath)
-            try:
+        try:
+            if (doReplace):
+                uploadToken = KalturaUploadToken()
+                client = api.getClient()
+                uploadToken = client.uploadToken.add(uploadToken)
+                ulfile = file(filepath)
                 client.uploadToken.upload(uploadToken.id, ulfile)
                 uploadedFileTokenResource = KalturaUploadedFileTokenResource()
                 uploadedFileTokenResource.token = uploadToken.id
                 client.media.addContent(self.entry.getId(), uploadedFileTokenResource)
-            except Exception as e:
-                self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
-                return False
-            try:
                 client.media.updateThumbnail(self.entry.getId(), 1)
-            except KalturaException as e:
-                self.log_action(logging.ERROR, doReplace, 'Replace Orig',
-                                'Could not replace thumbnail {}'.format(e))
+            return True
+        except Exception as e:
+            self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
             return False
-        return True
 
     def addTag(self, newtag, doUpdate=False):
         """
