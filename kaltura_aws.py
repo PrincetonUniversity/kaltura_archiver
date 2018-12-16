@@ -480,7 +480,7 @@ def restore_from_s3(params):
         if rc == RESTORE_DONE:
             wait_for_ready(mentry, doit)
 
-    _log_restore_counts(cunts)
+    _log_restore_counts(counts)
     return counts[RESTORE_FAILED]
 
 
