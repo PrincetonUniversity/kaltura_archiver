@@ -9,7 +9,6 @@ mkdir -p log/$dat
 log=log/$dat/restore-$$
 tsv=log/$dat/restore-$$-pending
 
-
 python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   > $log 2>&1
 
 # should print a count of near zero  - we may be waiting for videos to coe out of glacisr 
