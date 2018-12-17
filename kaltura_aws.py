@@ -378,6 +378,7 @@ def repair(params):
     depending on tags replace with place_holder video or with video from s3
 
     :param params: hash that contains kaltura connetion information as well as filtering options given to download action
+    :return  TODO number of repaired entries
     """
     doit = _setup(params, 'repair')
     filter = _create_filter(params)
@@ -419,8 +420,8 @@ def repair(params):
                             rc = RESTORE_DONE;
                             wait_for_ready(mentry, doit)
 
-    counts[rc] += 1
-    _log_restore_counts(counts)
+        counts[rc] += 1
+    #_log_restore_counts(counts)
     return counts[RESTORE_DONE]
 
 
