@@ -1,0 +1,14 @@
+#!/bin/bash 
+cd `dirname $0`
+# env vars  
+. nogit/bash.rc 
+max=10
+
+dat=$(date +%Y/%m/%d)
+mkdir -p log/$dat
+log=log/$dat/restore-$$
+
+python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   > $log 2>&1
+
+# should print a count of near zero  - we may be waiting for videos to coe out of glacisr 
+python kaltura_aws.py count --tag flavors_deleted --played_within 3  >> $log 2>&1
