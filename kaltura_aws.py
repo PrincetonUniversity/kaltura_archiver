@@ -66,7 +66,7 @@ It  uses the following environment variables
 
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=list)
 
@@ -123,7 +123,7 @@ check status of entries, that is check each matching entry for the following:
         return parser
 
     @staticmethod
-    def _add_filter_params(subparser):
+    def _add_filter_params(subparser, max_entries=25):
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--plays",  help="number of video plays")
@@ -137,7 +137,7 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
         subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
                                help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
-        subparser.add_argument("--max_entries", "-M",  type=int, default=25, help="maximum number of entries to work on  - default 25, -1 means unlimited")
+        subparser.add_argument("--max_entries", "-M",  type=int, default=max_entries, help="maximum number of entries to work on  - default {}, -1 means unlimited".format(max_entries))
 
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
 
