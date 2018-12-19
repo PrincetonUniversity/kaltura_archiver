@@ -452,7 +452,7 @@ RESTORE_WAIT_GLACIER = 2
 RESTORE_FAILED = 3
 
 def _log_restore_counts(counts):
-    if (counts[RESTORE_UNDEFINED] > 0):
+    if (RESTORE_UNDEFINED in counts): 
         kaltura.logger.info("# {}: {}".format('RESTORE_UNDEFINED', counts[RESTORE_UNDEFINED]) )
     kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
     kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
