@@ -26,3 +26,7 @@ alias ln='ln -i'
 alias vi=vim
 alias h='history 25'
 
+#git 
+alias gitqulog="git log --abbrev-commit '--pretty=%h %cn %s' --graph"
+
+
