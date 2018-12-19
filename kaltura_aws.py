@@ -64,16 +64,6 @@ It  uses the following environment variables
 
         subparsers.add_parser('config', description='test access to Kaltura KMC, AWS').set_defaults(func=check_config)
 
-        subparser = subparsers.add_parser('list', description="list matching videos ")
-        subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
-        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
-        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
-        subparser.set_defaults(func=list)
-
-        subparser = subparsers.add_parser('count', description="count matching videos ")
-        KalturaArgParser._add_filter_params(subparser)
-        subparser.set_defaults(func=count)
-
         subparser = subparsers.add_parser('repair', description="repair matching videos - look at tags and replace original flavor as tags indicate ")
         subparser.add_argument("--repair", action="store_true", default=False, help="performs in dryrun mode, unless repair param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
@@ -109,6 +99,16 @@ It  uses the following environment variables
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=download)
 
+        subparser = subparsers.add_parser('count', description="count matching videos ")
+        KalturaArgParser._add_filter_params(subparser)
+        subparser.set_defaults(func=count)
+
+        subparser = subparsers.add_parser('list', description="list matching videos ")
+        subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
+        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
+        subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
+        subparser.set_defaults(func=list)
+
         description = """
 check status of entries, that is check each matching entry for the following: 
   +  has original flavor in READY status,
@@ -116,7 +116,7 @@ check status of entries, that is check each matching entry for the following:
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('health', description=description)
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=health_check)
 
