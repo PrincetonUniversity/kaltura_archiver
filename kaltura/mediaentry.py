@@ -129,7 +129,11 @@ class MediaEntry:
                 uploadedFileTokenResource = KalturaUploadedFileTokenResource()
                 uploadedFileTokenResource.token = uploadToken.id
                 client.media.addContent(self.entry.getId(), uploadedFileTokenResource)
-                client.media.updateThumbnail(self.entry.getId(), 1)
+                try: 
+                    client.media.updateThumbnail(self.entry.getId(), 1)
+                except Exception as e:
+                    self.log_action(logging.ERROR, doReplace, "Replace Orig", "Failed to set thumbnail: " + str(e))
+                    return False
             return True
         except Exception as e:
             self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
