@@ -7,16 +7,20 @@ max=25
 dat=$(date +%Y/%m/%d)
 mkdir -p log/$dat
 log=log/$dat/restore-$$
-tsv=log/$dat/restore-$$-pending
+tsv=log/$dat/restore-pending
 
 python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   > $log 2>&1
+python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --created_within 3 --max_entries $max   >> $log 2>&1
 
-# should print a count of near zero  - we may be waiting for videos to coe out of glacisr 
+# should print a count of near zero  - we may be waiting for videos to coe out of glacier 
 python kaltura_aws.py count --tag flavors_deleted --played_within 3  >> $log 2>&1
 # should print a count of 0 
 python kaltura_aws.py count --tag flavors_deleted --created_within 3  >> $log 2>&1
 
 
 # list health of entries that still need to be restored 
-python kaltura_aws.py  health --tag flavors_deleted --played_within 3 >> $tsv 2>&1 
-python kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv 2>&1 
+python kaltura_aws.py  health --tag flavors_deleted --played_within 3 >> $tsv 2>> $tsv.log
+python kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv 2>> $tsv.log
+
+
+sort -u $tsv | tac > $tsv.tsv  
