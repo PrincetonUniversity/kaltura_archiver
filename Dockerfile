@@ -1,14 +1,12 @@
 # Taken from https://hub.docker.com/r/garland/aws-cli-docker/~/dockerfile/
 
-FROM alpine:3.8
-
-# Versions: https://pypi.python.org/pypi/awscli#downloads
-#ENV AWS_CLI_VERSION 1.11.131
+# install kaltura restore code 
+# git@bitbucket.org:princeton/kaltura.git
+FROM alpine:latest
 
 RUN apk --no-cache update && \
-    #apk --no-cache add python py-pip py-setuptools && \
-    # Install python3 and pip
     apk add bash && \
+    # Install python2 and pip
     apk add --no-cache python2 && \
     python2 -m ensurepip && \
     rm -r /usr/lib/python*/ensurepip && \
@@ -20,22 +18,22 @@ RUN apk --no-cache update && \
     pip --no-cache-dir install boto3 awscli && \
     # Install Kaltura SDK
     pip --no-cache-dir install KalturaApiClient && \
+	# get rid of apk cache
     rm -rf /var/cache/apk/*
 
-WORKDIR /data
-
+# create /data and copy kaltura_Aws.py and its dependencies  
+RUN mkdir /data
 RUN mkdir /data/kaltura
-ADD kaltura /data/kaltura/
-
-ADD envvars.py /data/
 ADD kaltura_aws.py /data/
-ADD restore.rc /data
+ADD kaltura /data/kaltura/
+ADD envvars.py /data/
+# the video is not used when restorig videos - but kaltura_aws.py insists on its existance 
 ADD placeholder_video.mp4 /data
 
+# restore.rc is a bash script; it restores videos - saves log file, generates report of broken videos and copies them to s3
+ADD restore.rc /data
+RUN chmod 744 /data/restore.rc
 RUN mkdir /data/log
 
-
-#RUN curl http://cdnbakmi.kaltura.com/content/clientlibs/python_02-10-2017.tar.gz | tar zx && \
-#    (cd /data/python; python setup.py install)
-
-RUN chmod 744 /data/restore.rc
+# /data is now ready for work
+WORKDIR /data
