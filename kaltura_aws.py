@@ -643,8 +643,6 @@ def health_check(params):
 
     columns = []
     nerror = 0
-
-    print('\t'.join(columns))
     columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
                PLACE_HOLDER_VIDEO, SAVED_TO_S3]
     print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, '---'])
@@ -689,7 +687,6 @@ def list(params):
     """
     _setup(params, None)
     filter = _create_filter(params)
-
     if (params['mode'] == 'video'):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.PLAYS,
                    kaltura.ENTRY_ID, kaltura.STATUS,  SAVED_TO_S3, PLACE_HOLDER_VIDEO,
