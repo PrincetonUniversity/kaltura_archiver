@@ -676,7 +676,7 @@ def count(params):
     _setup(params, None)
     filter = _create_filter(params)
     cnt = filter.get_count()
-    print("#COUNT\t{}".format(cnt))
+    print("#COUNT\t{}\t{}".format(cnt, filter))
     return 0
 
 

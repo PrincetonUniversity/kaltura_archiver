@@ -14,11 +14,12 @@ import api
 class Filter:
     MAX_PAGE_SIZE = 500
     ENTRY_STATUS_READY = KalturaEntryStatus.READY
+    ORDER_BY = "+createdAt"   # oldest first
 
     def __init__(self, mediaType=KalturaMediaType.VIDEO):
         self.filter = KalturaMediaEntryFilter()
         self.filter.mediaTypeEqual = mediaType
-        self.filter.orderBy = "+createdAt"  # Oldest first
+        self.filter.orderBy =  Filter.ORDER_BY
         self.page  = 1
         self.per_page  = Filter.MAX_PAGE_SIZE
         self.maximum_iter  = -1
@@ -182,11 +183,11 @@ class Filter:
 
     def __str__(self):
         vs = vars(self.filter)
-        properties = [[k, vs[k]] for k in vs.keys() if k != 'advancedSearch' and vs[k] != NotImplemented]
+        properties = ["{}={}".format(k, vs[k]) for k in vs.keys() if k not in ['advancedSearch', 'orderBy', 'mediaTypeEqual'] and vs[k] != NotImplemented]
         if (self.filter.advancedSearch != NotImplemented):
             avs = vars(self.filter.advancedSearch)
-            properties.append(['advancedSearch', [[k, avs[k]] for k in avs.keys() if avs[k] != NotImplemented]])
-        return "Filter({}:(start=page-{}, chunks={}), max={}".format(properties, self.page, self.per_page, self.maximum_iter)
+            properties.append(["{}={}".format(k, avs[k]) for k in avs.keys() if avs[k] != NotImplemented])
+        return "Filter({}, [page:{} len:{} max={}])".format(properties, self.page, self.per_page, self.maximum_iter)
 
     def __repr__(self):
         return str(self)
