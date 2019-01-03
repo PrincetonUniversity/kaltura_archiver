@@ -17,7 +17,7 @@ RUN apk --no-cache update && \
     if [[ ! -e /usr/bin/python ]]; then ln -sf /usr/bin/python2 /usr/bin/python; fi && \
     rm -r /root/.cache && \
     # Install AWS SDK
-    pip --no-cache-dir install boto3 && \
+    pip --no-cache-dir install boto3 awscli && \
     # Install Kaltura SDK
     pip --no-cache-dir install KalturaApiClient && \
     rm -rf /var/cache/apk/*
