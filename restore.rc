@@ -9,24 +9,35 @@ mkdir -p log/$dat
 log=log/$dat/restore-$(date +%s)
 tsv=log/$dat/restore-pending
 
+# ----------------------------------------------------------------------------------------
+# dryrun restore  of videos played and created within last 3 years -
+# the latter should not ever be the case but we might as well cleanup if errors occur 
 python kaltura_aws.py restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max   > $log 2>&1
+python kaltura_aws.py restore_from_s3 --tag flavors_deleted --created_within 3 --max_entries $max   >> $log 2>&1
+#--- restore for real 
 #python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   > $log 2>&1
 #python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --created_within 3 --max_entries $max   >> $log 2>&1
 
-# should print a count of near zero  - we may be waiting for videos to come out of glacier 
+
+# ---------------------------------------------------------
+# print counts of videos that should but have not yet been restored 
+#
+# should print a count near zero  - we may be waiting for videos to come out of glacier
 python kaltura_aws.py count --tag flavors_deleted --played_within 3  >> $log 2>&1
 # should print a count of 0 
-python kaltura_aws.py count --tag flavors_deleted --created_within 3  >> $log 2>&1
+python kaltura_aws.py  count --tag flavors_deleted --created_within 3  >> $log 2>&1
 
 
-# list health of entries that still need to be restored 
-#python kaltura_aws.py  health --tag flavors_deleted --played_within 3 >> $tsv 2>> $tsv.log
-#python kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv 2>> $tsv.log
+# ----------------------------------------------------------------------------------------
+# generate  health  report of entries that still need to be restored
+python kaltura_aws.py  health --tag flavors_deleted --played_within 3 > $tsv 2>> $tsv.log
+python kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv 2>> $tsv.log
+# combine and clean up 
+echo "#Entries created or played within last 3 years that have a flavors-delted tag" >> $tsv.tsv
+fgrep entry_id  $tsv | head -n 1 >> $tsv.tsv
+sort -u $tsv >> $tsv.tsv
 
-
-#sort -u $tsv | tac > $tsv.tsv  
-
-
-
-# cpy to s3 
+# ----------------------------------------------------------------------------------------
+# copy to retosre log and report to s3 
 aws s3 cp $log  s3://$AWS_BUCKET/$log
+aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
