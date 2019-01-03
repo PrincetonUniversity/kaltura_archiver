@@ -239,6 +239,26 @@ set environment variabes so code connects to TEST KMC, then run:
 python -m unittest discover -v test
 ~~~
 
+## Docker 
+
+Build and Docker image and tag it with a name 
+~~~
+docker build --tag IMAGE_NAME .
+~~~
+
+Run restore.rc script in a container 
+
+~~~
+docker run --env KALTURA_USERID=NETID@princeton.edu \
+	--env KALTURA_PARTNERID=P-ID \
+	--env KALTURA_SECRET=P-SECRET \
+	--env AWS_ACCESS_KEY_ID=A-ID \
+	--env AWS_SECRET_ACCESS_KEY=A-KEY \
+	--env AWS_BUCKET=BUCKET-NAME \
+	--env PLACEHOLDER_VIDEO=placeholder_video.mp4 \
+	IMAGE_NAME  './restore.rc'
+~~~
+
 ## Installation
 
 ### Python and Packages 
