@@ -58,7 +58,7 @@ It  uses the following environment variables
 
         loglevels = ['ERROR', 'WARN', 'INFO', 'DEBUG']
         parser = KalturaArgParser(description=description, formatter_class=RawDescriptionHelpFormatter)
-        parser.add_argument("--loglevel", "-l", choices=loglevels,  default=logging.INFO, help="log level  - default: INFO")
+        parser.add_argument("--loglevel", "-l", choices=loglevels,  default=logging.WARN, help="log level  - default: WARN")
 
         subparsers = parser.add_subparsers(help='sub-command help')
 
@@ -452,13 +452,14 @@ RESTORE_DONE_BEFORE = 1
 RESTORE_WAIT_GLACIER = 2
 RESTORE_FAILED = 3
 
-def _log_restore_counts(counts):
-    if (RESTORE_UNDEFINED in counts): 
-        kaltura.logger.info("# {}: {}".format('RESTORE_UNDEFINED', counts[RESTORE_UNDEFINED]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_DONE_BEFORE', counts[RESTORE_DONE_BEFORE]) )
-    kaltura.logger.info("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
+def _log_restore_counts(counts, filter):
+    print("RESTORE Filter {}".format(filter))
+    if (RESTORE_UNDEFINED in counts):
+        print("# {}: {}".format('RESTORE_UNDEFINED', counts[RESTORE_UNDEFINED]) )
+    print("# {}: {}".format('RESTORE_FAILED', counts[RESTORE_FAILED]) )
+    print("# {}: {}".format('RESTORE_WAIT_GLACIER', counts[RESTORE_WAIT_GLACIER]) )
+    print("# {}: {}".format('RESTORE_DONE_BEFORE', counts[RESTORE_DONE_BEFORE]) )
+    print("# {}: {}".format('RESTORE_DONE', counts[RESTORE_DONE]) )
 
 def restore_from_s3(params):
     """
@@ -469,7 +470,6 @@ def restore_from_s3(params):
     :param params: hash that contains kaltura connection information as well as filtering options given for the restore action
     :return:  number of failures
     """
-    doit = _setup(params, 'restore')
     doit = _setup(params, 'restore')
     filter = _create_filter(params)
     bucket = params['awsBucket']
@@ -482,7 +482,7 @@ def restore_from_s3(params):
         if rc == RESTORE_DONE:
             wait_for_ready(mentry, doit)
 
-    _log_restore_counts(counts)
+    _log_restore_counts(counts, filter)
     return counts[RESTORE_FAILED]
 
 
@@ -563,10 +563,11 @@ def replace_videos(params):
             wait_for_ready(mentry, doit)
         counts[rc] += 1
 
-    kaltura.logger.info("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
-    kaltura.logger.info("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
-    kaltura.logger.info("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
-    kaltura.logger.info("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
+    print("REPLACE Filter {}".format(filter))
+    print("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
+    print("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
+    print("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
+    print("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
     return counts[REPLACE_FAILED]
 
 def wait_for_ready(mentry, doit):
