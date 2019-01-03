@@ -262,7 +262,6 @@ Install necessary packages
 ~~~
 curl -O http://cdnbakmi.kaltura.com/content/clientlibs/python_02-03-2017.tar.gz
 pip install python_02-03-2017.tar.gz
-pip install poster 
-
 pip install  awscli --upgrade
+pip install KalturaApiClient
 ~~~
