@@ -30,6 +30,7 @@ ADD kaltura /data/kaltura/
 ADD envvars.py /data/
 ADD kaltura_aws.py /data/
 ADD restore.rc /data
+ADD placeholder_video.mp4 /data
 
 RUN mkdir /data/log
 
