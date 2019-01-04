@@ -23,6 +23,8 @@ RUN apk --no-cache update && \
 
 # create /data and copy kaltura_Aws.py and its dependencies  
 RUN mkdir /data
+WORKDIR /data
+
 RUN mkdir /data/kaltura
 ADD kaltura_aws.py /data/
 ADD kaltura /data/kaltura/
@@ -35,5 +37,20 @@ ADD restore.rc /data
 RUN chmod 744 /data/restore.rc
 RUN mkdir /data/log
 
+
+# put latest commit hash in dedicated file 
+# does not work when in detached mode - but should not build image anyway 
+RUN mkdir /git
+WORKDIR /git
+ADD .git/HEAD /git
+ADD .git/refs/heads /git
+RUN sed 's,.*/,,' HEAD > /data/BRANCH
+RUN cat `cat /data/BRANCH`  > /data/COMMIT-HASH
+RUN rm -r /git 
+
 # /data is now ready for work
-WORKDIR /data
+WORKDIR /data 
+
+
+
+
