@@ -241,7 +241,7 @@ python -m unittest discover -v test
 
 ## Docker 
 
-Build and Docker image and tag it with a name 
+Build Docker image and tag it with a name 
 ~~~
 docker build --tag IMAGE_NAME .
 ~~~
@@ -257,6 +257,11 @@ docker run --env KALTURA_USERID=NETID@princeton.edu \
 	--env AWS_BUCKET=BUCKET-NAME \
 	--env PLACEHOLDER_VIDEO=placeholder_video.mp4 \
 	IMAGE_NAME  './restore.rc'
+~~~
+
+Build image and push AWS   
+~~~
+docker_push
 ~~~
 
 ## Installation
