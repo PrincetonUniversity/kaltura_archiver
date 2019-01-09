@@ -50,7 +50,7 @@ RUN rm -r /git
 
 # /data is now ready for work
 WORKDIR /data 
-
+# execute ./restore.rc
 
 
 
