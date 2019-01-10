@@ -11,8 +11,8 @@ tsv=log/$dat/restore-pending
 # ----------------------------------------------------------------------------------------
 # dryrun restore  of videos played and created within last 3 years -
 # the latter should not ever be the case but we might as well cleanup if errors occur 
-python kaltura_aws.py restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max   
-python kaltura_aws.py restore_from_s3 --tag flavors_deleted --created_within 3 --max_entries $max   
+python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   
+python kaltura_aws.py restore_from_s3 --restore  --tag flavors_deleted --created_within 3 --max_entries $max   
 #--- restore for real 
 #python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   
 #python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --created_within 3 --max_entries $max   
