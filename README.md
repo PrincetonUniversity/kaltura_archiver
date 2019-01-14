@@ -238,7 +238,8 @@ set environment variabes so code connects to TEST KMC, then run:
 python -m unittest discover -v test
 ~~~
 
-## Docker 
+## Docker  
+
 
 Build Docker image and tag it with a name 
 ~~~
@@ -258,10 +259,39 @@ docker run --env KALTURA_USERID=NETID@princeton.edu \
 	IMAGE_NAME  './restore.rc'
 ~~~
 
-Build image and push AWS   
+## AWS 
+
+We run the current code in the CISDR-ADMIN account in AWS 
+
+The code is excuted by running in a task that uses a docker container.
+
+The related docker image is defined in the ECS `fargate-cluster`, 
+which contains the `kaltura-restores` repository. 
+The repository is where the latest Docker image based on the local [Dockerfile](./Dockerfile) is uploaded. 
+The push commands are listed on the repository page in the AWS console and should be the same as used by the command:
 ~~~
 docker_push
 ~~~
+
+ECS also contains `kaltura-restores` Task definition, which encapsulate the docker image to be run as well as 
+environment variables to be passed to a container execution. 
+
+A  `trigger-kaltura-restore` CloudWatch Rule triggers the execution of the  `kaltura-restore` Lambda function, 
+which starts a Task executions. 
+The Lambda function uses the [docker_run_task.py](./docker_run_task.py)  code.
+The Rule defines a static event to be passed to the Lambda function, 
+that describes which Task to run, where to run, ... 
+The static event should look similar to this (use double not single quotes): 
+~~~ 
+{ 
+    "cluster": "fargate-cluster",
+    "platformVersion": "LATEST",
+    "securityGroup": "sg-xxxxxxxx,
+    "subnet": ["subnet-xxxxxxxx],
+    "taskName": "kaltura-restores:VERSION_ID"
+}
+~~~ 
+ 
 
 ## Installation
 
