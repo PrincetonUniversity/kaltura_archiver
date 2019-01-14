@@ -178,7 +178,7 @@ The kaltura_aws.py command will error out when asked to replace the video unless
 So only if a video is replaced after archival which is unlikely since few users have that ability 
 and if the versioned video has the same size, which is even more unlikely, will the procedure loose the versioned video. 
 
-### reports ### 
+## Reports ## 
 
 ### video list with creator ids and their ldap status ### 
 Use this report to generate a list of videos with information on the creator associated with the entry: 
@@ -198,12 +198,11 @@ ldap expression that determines whether an account is active:
 cat list.tsv | add_ldap_status.py > emhanced_list.tsv 
 ~~~
 
-### rough statistics ###
+### Overview Statistics  ###
 
-counts video entries that have been played in the laste 20 years 
+counts videos played / created within given years, how many have place holder videos, ... ; 
 
-cmputes TB of entries that were played in the last year 
-
+useful to estimate how much more space can be saved by replacing videos with the placeholder 
 ~~~
 stats.py
 ~~~

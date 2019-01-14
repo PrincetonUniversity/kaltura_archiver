@@ -8,11 +8,14 @@ import logging
 
 kaltura.logger.setLevel(logging.DEBUG)
 
+DEFAULT_FILTER_STATUS_LIST = ",".join(DEFAULT_STATUS_LIST)
+
 
 def setUp():
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
-    formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
+    # turn to True for lots of logging
     if (False):
+        formatter = logging.Formatter('%(asctime)s %(levelname)-5s %(message)s')
         handler = logging.StreamHandler()
         handler.setFormatter(formatter)
         kaltura.logger.addHandler(handler)
@@ -36,44 +39,37 @@ def year_status(year, sizes=False):
     if (n > 0):
         if (sizes):
             totalTB =  KB_2_TB(sum_sizes(f))
-            print "PLAYED between CUR-{} - CUR-{} years: {}   total-size TB {}".format(year, year - 1, n ,totalTB)
+            print "PLAYED between CUR-{} - CUR-{} years: #videos: {}  total-size TB {}".format(year, year - 1, n ,totalTB)
         else:
-            print "PLAYED between CUR-{} - CUR-{} years: {}".format(year, year - 1, n)
+            print "PLAYED between CUR-{} - CUR-{} years: #videos: {}".format(year, year - 1, n)
     return n
 
+def play_info_creation_year(year):
+    f = kaltura.Filter().page_size(1000).years_since_created(year-1).created_wthin_years(year)
+    n = f.get_count()
+    f = f.tag(PLACE_HOLDER_VIDEO)
+    n_placeholder = f.get_count()
+    if (n > 0):
+        print "CREATED between CUR-{} - CUR-{} years: #videos: {}   #place-holder {}".format(year, year - 1, n, n_placeholder)
+
 def count():
-    print "ALL: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_STATUS_LIST).get_count())
-    print "SAVED_TO_S3: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_STATUS_LIST).tag(SAVED_TO_S3).get_count())
-    print "PLACE_HOLDER_VIDEO: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_STATUS_LIST).tag(PLACE_HOLDER_VIDEO).get_count())
+    flter = kaltura.Filter().page_size(1).status(DEFAULT_FILTER_STATUS_LIST)
+    print(str(flter))
+    print "ALL: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_FILTER_STATUS_LIST).get_count())
+    print "SAVED_TO_S3: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_FILTER_STATUS_LIST).tag(SAVED_TO_S3).get_count())
+    print "PLACE_HOLDER_VIDEO: {}".format(kaltura.Filter().page_size(1).status(DEFAULT_FILTER_STATUS_LIST).tag(PLACE_HOLDER_VIDEO).get_count())
+    print("")
+
+    for year in range(8, 0, -1):
+        play_info_creation_year(year)
+    print("")
 
     sum = 0
     for year in range(5, 0, -1):
         sum += year_status(year, False)
+    print("")
 
-    pre = "undefined_LAST_PLAYED_AT"
-    n_noLastPLayed = kaltura.Filter().page_size(1).status(DEFAULT_STATUS_LIST).undefined_LAST_PLAYED_AT().get_count()
-    print "{}: {}".format(pre, n_noLastPLayed)
-    sum = sum + n_noLastPLayed
-    print("{}: #{} {}".format(pre, 'TOTAL', sum))
-
-    print('')
-    print("{}: #{} {}".format(pre, 'TOTAL', n_noLastPLayed))
-    n, n_saved, n_pholder = 0, 0, 0
-    try:
-        for e in kaltura.Filter().page_size(1000).status(DEFAULT_STATUS_LIST).undefined_LAST_PLAYED_AT():
-            n += 1
-            if (SAVED_TO_S3 in e.getTags()):
-                n_saved += 1
-            if (PLACE_HOLDER_VIDEO in e.getTags()):
-                n_pholder += 1
-    except Exception as e:
-        print(str(e))
-        traceback.print_exc()
-    print("{}: #{} {}".format(pre, 'TOTAL', n))
-    print("{}: #{} {}".format(pre, SAVED_TO_S3, n_saved))
-    print("{}: #{} {}".format(pre, PLACE_HOLDER_VIDEO, n_pholder))
-
-    if (False):
+    if (True):
         print("")
         print("TB of videos played in last year - ... - will take a while to compute")
         year_status(1, True)
