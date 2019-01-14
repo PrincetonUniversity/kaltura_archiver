@@ -1,8 +1,3 @@
-"""
- This function MUST BE triggered on the days that the MySQL database is updated 
- with all WordPress and Drupal users (Summer 2018: Mondays and Thursdays).
-"""
-
 from __future__ import print_function
 import sys
 import boto3
