@@ -311,7 +311,8 @@ def entry_health_check(mentry, bucket):
     if healthy and  replaced_tag and not saved_tag:
         explanation= 'ERROR: has tag {} - but no {} tag'.format(PLACE_HOLDER_VIDEO, SAVED_TO_S3)
         healthy = False
-
+   
+    compatible_size = False
     if (original):
         compatible_size = aws_compatible_size(original.getSize(), aws.s3_size(entry.getId(), bucket))
         # if it is saved and not tagged PLACE_HOLDER_VIDEO then original flavor and s3 entry size should match
@@ -329,7 +330,7 @@ def entry_health_check(mentry, bucket):
 
     if (healthy and not explanation):
         explanation= 'HEALTHY'
-    return  healthy, explanation
+    return  healthy,compatible_size,  explanation
 
 
 def copy_to_s3(params):
@@ -393,7 +394,7 @@ def repair(params):
         checker = CheckAndLog(mentry)
         rc = RESTORE_UNDEFINED
 
-        healthy, reason = entry_health_check(mentry, bucket)
+        healthy, _, reason = entry_health_check(mentry, bucket)
         if (healthy):
             rc = RESTORE_DONE_BEFORE;
             mentry.log_action(logging.INFO, doit, 'Repair', 'No Need: ' + reason);
@@ -646,13 +647,13 @@ def health_check(params):
     nerror = 0
     columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
                PLACE_HOLDER_VIDEO, SAVED_TO_S3]
-    print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, '---'])
+    print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, 'size_match', '---'])
     for entry in filter:
         mentry = kaltura.MediaEntry(entry);
-        healthy, message = entry_health_check(mentry, bucket)
+        healthy, comp_size, message = entry_health_check(mentry, bucket)
         vals = [mentry.report_str(kaltura.ENTRY_ID), str(healthy).ljust(len('status-ok'))]
         vals = vals + [mentry.report_str(c) for c in columns]
-        vals = vals + [str(aws.s3_size(entry.getId(), bucket)/1024), mentry.report_str(kaltura.ORIGINAL_SIZE), message]
+        vals = vals + [str(aws.s3_size(entry.getId(), bucket)/1024), mentry.report_str(kaltura.ORIGINAL_SIZE), str(comp_size), message]
 
         print "\t".join(v.decode('utf-8') for v in vals)
         if (not healthy):
@@ -692,7 +693,7 @@ def list(params):
         columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.PLAYS,
                    kaltura.ENTRY_ID, kaltura.STATUS,  SAVED_TO_S3, PLACE_HOLDER_VIDEO,
                    kaltura.TOTAL_SIZE, kaltura.ORIGINAL_SIZE, kaltura.ORIGINAL_STATUS,
-                   kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID]
+                   kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID, kaltura.TAGS]
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)

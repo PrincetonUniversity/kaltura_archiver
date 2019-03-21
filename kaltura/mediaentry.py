@@ -188,7 +188,7 @@ class MediaEntry:
         if column == CATEGORIES:
             return self.entry.getCategories().encode('utf-8')
         if column == CATEGORIES_IDS:
-            return '{:>15}'.format(self.entry.getCategoriesIds().encode('utf-8'))
+            return '{:>15}'.format(self.entry.getCategoriesIds())
         original = self.getOriginalFlavor()
         if column == ORIGINAL:
             return '{:>10}'.format(original.getId() if original else  '')
