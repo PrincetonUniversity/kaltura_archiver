@@ -13,3 +13,7 @@ setenv AWS_BUCKET bucket_name
 # video to use for replacement
 setenv PLACEHOLDER_VIDEO placeholder_video.mp4
 
+# specific to add_ldap_status.py
+setenv LDAP_SERVER xxxx.princeton.edu
+setenv LDAP_USER   zzzzz
+setenv LDAP_PWD    yyyyy

@@ -5,7 +5,7 @@ The script [kaltura_aws.py](kaltura_aws.py) is the main script to be run.
 
 It lists, archives and restores videos in Kaltura.  
 It relies on environment variables to authenticate against the Kaltura KMC  and AWS. 
-Start with  the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) set the relevant environment variables. 
+Start with  the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) to set the relevant environment variables. 
 
 Use the help option for further documentation 
 
@@ -19,7 +19,7 @@ Only videos that have not been played recently are archived.
 Only videos smaller than  10000000kb are archived
  
 
-The [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
+[kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
 
  1. number of years since placed
  2. whethertion date   
@@ -155,7 +155,7 @@ python kaltura_aws.py list --created_before 3 --created_within 4 --plays 0
 
 ### Restoring Videos
 
-Klatura updates the lastPlayedAt property of videos when they are played. 
+Kaltura updates the lastPlayedAt property of videos when they are played. 
 So when a placeholder video is played it receives the current date as is its lastPlayedAt property
 
 Apply the following steps to videos with the tag "archived_to_s3" that have been played within the last year
@@ -178,23 +178,20 @@ The kaltura_aws.py command will error out when asked to replace the video unless
 So only if a video is replaced after archival which is unlikely since few users have that ability 
 and if the versioned video has the same size, which is even more unlikely, will the procedure loose the versioned video. 
 
-## Reports ## 
+## Enhance tsv Report with ldap information ## 
 
-### video list with creator ids and their ldap status ### 
-Use this report to generate a list of videos with information on the creator associated with the entry: 
-   1. creators netid 
-   1. active/inactive according to ldap 
-   1. name 
-   1. org unit 
-   
-   
-ldap expression that determines whether an account is active: 
+[add_ldap_status.py](iadd_ldap_status.py]) adds three columns 'status', 'name', and 'org_unit' to a tsv report. 
+It derives these values from the creator_id value in the tsv report and ldap status data. 
+
+It uses the hard coded ldap base, 'o=princeton university,c=us', and the following 
+ ldap expression todetermine whether a user is stillactive,  see  [puldap.py](puldap.py)
 ~~~
 (&(uid=<NETID>)(|(puresource=authentication=enabled)(puresource=authentication=goingaway)))
 ~~~
 
+Use as follows: 
 ~~~ 
-./kaltura_aws.py list   [filter-options]a > list.tsv 
+./kaltura_aws.py list   [filter-options] > list.tsv 
 cat list.tsv | add_ldap_status.py > emhanced_list.tsv 
 ~~~
 
@@ -207,14 +204,19 @@ useful to estimate how much more space can be saved by replacing videos with the
 stats.py
 ~~~
 
-### See Early Requirements  
-https://docs.google.com/document/d/1x-Snkv--fwuH8Yx3BBbbLr1sgIXA9Lhu5mAzTV5nfy0/edit
-
-
 ## Troubleshooting 
 
-### Manually test ldap credentials/search on CLI
 
+## Execute Tests 
+
+set environment variabes so code connects to TEST KMC, then run: 
+
+~~~
+python -m unittest discover -v test
+~~~
+
+
+### Manually test ldap credentials/search on CLI
 run on the command line  - you may have to install the [openldap package](http://www.openldap.org)
 
 on EC2 server run 'sudo yum install openldap-clients'
@@ -230,13 +232,6 @@ ldapsearch -LLL -x -H "ldaps://$LDAP_SERVER/" -b "o=Princeton University,c=US" -
 ~~~
 
 
-## Execute Tests 
-
-set environment variabes so code connects to TEST KMC, then run: 
-
-~~~
-python -m unittest discover -v test
-~~~
 
 ## Docker  
 
@@ -316,7 +311,10 @@ Install necessary packages
 ~~~
 curl -O http://cdnbakmi.kaltura.com/content/clientlibs/python_02-03-2017.tar.gz
 pip install python_02-03-2017.tar.gz
-pip install  awscli --upgrade
-pip install  boto3  --upgrade
-pip install KalturaApiClient
+
+pip install poster 
+pip install boto3  --upgrade
+
+#optional - aws command line tools
+pip install awscli --upgrade
 ~~~

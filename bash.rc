@@ -12,3 +12,8 @@ export AWS_BUCKET=bucket_name
 
 # video to use for replacement
 export PLACEHOLDER_VIDEO=placeholder_video.mp4
+
+# specific to add_ldap_status.py
+export LDAP_SERVER=xxxx.princeton.edu
+export LDAP_USER=zzzzz
+export LDAP_PWD=yyyyy
