@@ -6,7 +6,6 @@ except Exception as e:
 import logging
 import urllib
 import os
-import  traceback
 
 from KalturaClient.Plugins.Core import *
 
