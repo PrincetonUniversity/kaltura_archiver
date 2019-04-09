@@ -21,12 +21,12 @@ Only videos smaller than  10000000kb are archived
 
 [kaltura_aws.py](kaltura_aws.py)  provides parameters to select videos based on the following criteria: 
 
- 1. number of years since placed
- 2. whethertion date   
+ 1. number of years since placed/created
+ 3. played/created within given number of years
  3. category id 
  3. tag value 
  3. the number of times the video was played 
- 4. status of entry - eg READY (2), QUEDE (0), ERROR (-1), .. see   KalturaEntryStatus class in KalturaClient.Plugins.Core 
+ 4. status of entry - eg READY (2), QUEUED (0), ERROR (-1), .. see   KalturaEntryStatus class in KalturaClient.Plugins.Core 
  5. entry id 
 
 Most critera can be combined.
