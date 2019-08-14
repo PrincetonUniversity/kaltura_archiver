@@ -7,8 +7,8 @@ echo $branch $commit $upstream
 # TODO make sure everything is committed
 
 # cut-and-paste from AWS console 
-$(aws ecr get-login --no-include-email --region us-east-1)
 docker build -t kaltura-restores .
 docker tag kaltura-restores:latest 168298894881.dkr.ecr.us-east-1.amazonaws.com/kaltura-restores:latest
+$(aws ecr get-login --no-include-email --region us-east-1)
 docker push 168298894881.dkr.ecr.us-east-1.amazonaws.com/kaltura-restores:latest
 docker images | fgrep kaltura-restores 
