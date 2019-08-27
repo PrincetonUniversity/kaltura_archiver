@@ -1,0 +1,4 @@
+boto3
+awscli
+KalturaClient==3.3.1
+
