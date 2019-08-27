@@ -12,11 +12,11 @@ tsv=log/$dat/archive-unplayed
 # ----------------------------------------------------------------------------------------
 # backup videos not yet archived that are unplayed within last 3 years
 echo  backup videos to s3 not yet copied to s3  that are unplayed within last 3 years
-#python kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3
+python kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3 --s3copy
 #
 # replace backedup  videos unplayed within last 3 years
 echo replace backed-up  videos unplayed within last 3 years
-#python kaltura_aws.py replace_video --unplayed_for 3 --tag archived_to_s3
+python kaltura_aws.py replace_video --unplayed_for 3 --tag archived_to_s3 --replace
 echo ""
 
 # ---------------------------------------------------------

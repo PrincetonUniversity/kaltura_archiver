@@ -17,7 +17,7 @@ RUN apk --no-cache update && \
     # Install AWS SDK
     pip --no-cache-dir install boto3 awscli && \
     # Install Kaltura SDK
-    pip --no-cache-dir install KalturaApiClient && \
+    pip --no-cache-dir install KalturaApiClient==3.3.1  && \
 	# get rid of apk cache
     rm -rf /var/cache/apk/*
 
@@ -35,6 +35,8 @@ ADD placeholder_video.mp4 /data
 # restore.rc is a bash script; it restores videos - saves log file, generates report of broken videos and copies them to s3
 ADD restore.rc /data
 RUN chmod 744 /data/restore.rc
+ADD archive.rc /data
+RUN chmod 744 /data/archive.rc
 RUN mkdir /data/log
 
 
