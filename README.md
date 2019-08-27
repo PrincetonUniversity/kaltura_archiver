@@ -241,17 +241,23 @@ Build Docker image and tag it with a name
 docker build --tag IMAGE_NAME .
 ~~~
 
-Run restore.rc script in a container 
+Run script in a container 
 
 ~~~
-docker run --env KALTURA_USERID=NETID@princeton.edu \
-	--env KALTURA_PARTNERID=P-ID \
-	--env KALTURA_SECRET=P-SECRET \
-	--env AWS_ACCESS_KEY_ID=A-ID \
-	--env AWS_SECRET_ACCESS_KEY=A-KEY \
-	--env AWS_BUCKET=BUCKET-NAME \
-	--env PLACEHOLDER_VIDEO=placeholder_video.mp4 \
-	IMAGE_NAME  './restore.rc'
+docker run --env-file env.list  IMAGE_NAME  './restore.rc'
+docker run --env-file env.list  IMAGE_NAME  './archive.rc'
+~~~
+
+where envlist is formatted as 
+
+~~~
+KALTURA_USERID=NETID@princeton.edu \
+KALTURA_PARTNERID=P-ID \
+KALTURA_SECRET=P-SECRET \
+AWS_ACCESS_KEY_ID=A-ID \
+AWS_SECRET_ACCESS_KEY=A-KEY \
+AWS_BUCKET=BUCKET-NAME \
+PLACEHOLDER_VIDEO=placeholder_video.mp4 \
 ~~~
 
 ## AWS 
