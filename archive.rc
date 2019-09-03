@@ -20,7 +20,7 @@ python src/kaltura_aws.py replace_video --unplayed_for 3 --tag archived_to_s3 --
 echo ""
 
 # ---------------------------------------------------------
-# print counts of videos that should but have not yet been archived
+# print counts of videos that should but have not yet been archived and replaced
 echo  count of videos that should but have not yet been ARCHIVED
 python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3
 echo count of videos that should but have not yet been REPLACED
@@ -34,5 +34,5 @@ python src/kaltura_aws.py list  --unplayed_for 3 --tag \!flavors_deleted >> $tsv
 
 
 # ----------------------------------------------------------------------------------------
-# copy report tnd log o s3
+# copy report to log in s3
 #aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
