@@ -1,14 +1,16 @@
-#!/bin/bash
+#!/bin/bash -e
 branch=$(git rev-parse --abbrev-ref  HEAD)
 commit=$(git rev-parse HEAD)
 upstream=$(git rev-parse --abbrev-ref "$branch@{upstream}")
 echo $branch $commit $upstream
 
+echo -n "ECR repository-name> ";   read repo
+
 # TODO make sure everything is committed
 
 # cut-and-paste from AWS console 
-docker build -t kaltura-restores .
-docker tag kaltura-restores:latest 168298894881.dkr.ecr.us-east-1.amazonaws.com/kaltura-restores:latest
+docker build -t $repo .
+docker tag $repo":latest" 168298894881.dkr.ecr.us-east-1.amazonaws.com/$repo":latest"
 $(aws ecr get-login --no-include-email --region us-east-1)
-docker push 168298894881.dkr.ecr.us-east-1.amazonaws.com/kaltura-restores:latest
-docker images | fgrep kaltura-restores 
+docker push 168298894881.dkr.ecr.us-east-1.amazonaws.com/$repo":latest"
+docker images | fgrep $repo
