@@ -4,9 +4,10 @@ cd `dirname $0`
 #. nogit/bash.rc 
 max=25
 
-dat=$(date +%Y/%m/%d)
-mkdir -p log/$dat
-tsv=log/$dat/restore-pending
+tag=restore-pending
+log_dir=$(date +log/%Y/%m/%d)
+mkdir -p $log_dir
+tsv=$(date +$log_dir/$tag-%H:%M:%S)
 
 # ----------------------------------------------------------------------------------------
 # restore videos played or created within last 3 years -
