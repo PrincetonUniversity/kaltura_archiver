@@ -260,6 +260,18 @@ AWS_BUCKET=BUCKET-NAME \
 PLACEHOLDER_VIDEO=placeholder_video.mp4 \
 ~~~
 
+### Locally Test Docker Image 
+
+~~~
+docker build -t test .
+
+# list info on test image
+docker images test 
+
+# start container and enter sh 
+docker run --env-file env.list -i -t test sh
+~~~
+
 ## AWS 
 
 We run the current code in the CISDR-ADMIN account in AWS 
