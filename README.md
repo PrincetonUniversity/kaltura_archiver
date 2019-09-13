@@ -340,3 +340,4 @@ pip install awscli --upgrade
 ## Versions 
 
 V1.0.0   kaltura archiver executing in docker 
+V1.1.0   kaltura archiver and restorer in same docker image 
