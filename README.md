@@ -318,3 +318,7 @@ pip install boto3  --upgrade
 #optional - aws command line tools
 pip install awscli --upgrade
 ~~~
+
+## Versions 
+
+V1.0.0   kaltura archiver executing in docker 
