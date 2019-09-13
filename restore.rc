@@ -4,38 +4,41 @@ cd `dirname $0`
 #. nogit/bash.rc 
 max=25
 
-dat=$(date +%Y/%m/%d)
-mkdir -p log/$dat
-tsv=log/$dat/restore-pending
+tag=restore-pending
+log_dir=$(date +log/%Y/%m/%d)
+mkdir -p $log_dir
+tsv=$(date +$log_dir/$tag-%H:%M:%S)
 
 # ----------------------------------------------------------------------------------------
-# dryrun restore  of videos played and created within last 3 years -
-# the latter should not ever be the case but we might as well cleanup if errors occur 
-python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   
-python kaltura_aws.py restore_from_s3 --restore  --tag flavors_deleted --created_within 3 --max_entries $max   
-#--- restore for real 
-#python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max   
-#python kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --created_within 3 --max_entries $max   
-
-
+# restore videos played or created within last 3 years -
+# the latter should not ever be the case but we might as well cleanup if errors occur
+#
+echo "restore deleted videos PLAYED within 3 YEARS"
+python src/kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max
+echo "restore deleted videos CREATED within 3 YEARS"
+python src/kaltura_aws.py restore_from_s3 --restore  --tag flavors_deleted --created_within 3 --max_entries $max
+echo ""
 # ---------------------------------------------------------
 # print counts of videos that should but have not yet been restored 
 #
 # should print a count near zero  - we may be waiting for videos to come out of glacier
-python kaltura_aws.py count --tag flavors_deleted --played_within 3  
-# should print a count of 0 
-python kaltura_aws.py  count --tag flavors_deleted --created_within 3  
+# should print a count of 0
+echo "#videos DELETED and PLAYED within 3 years"
+python src/kaltura_aws.py count --tag flavors_deleted --played_within 3
+echo "#videos DELETED and CREATED within 3 years"
+python src/kaltura_aws.py  count --tag flavors_deleted --created_within 3
+echo ""
 
 
 # ----------------------------------------------------------------------------------------
 # generate  health  report of entries that still need to be restored
-python kaltura_aws.py  health --tag flavors_deleted --played_within 3 > $tsv 2>> $tsv.log
-python kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv 2>> $tsv.log
+python src/kaltura_aws.py  health --tag flavors_deleted --played_within 3 > $tsv
+python src/kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv
 # combine and clean up 
 echo "#Entries created or played within last 3 years that have a flavors-delted tag" >> $tsv.tsv
 fgrep entry_id  $tsv | head -n 1 >> $tsv.tsv
 sort -u $tsv >> $tsv.tsv
 
 # ----------------------------------------------------------------------------------------
-# copy to retosre log and report to s3 
+# copy report to s3
 aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv

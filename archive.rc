@@ -1,0 +1,38 @@
+#!/bin/bash
+cd `dirname $0`
+# env vars
+#. nogit/bash.rc
+# max_entries  -1 <=> unlimited
+
+tag=unplayed-not-archived
+log_dir=$(date +log/%Y/%m/%d)
+mkdir -p $log_dir
+tsv=$(date +$log_dir/$tag-%H:%M:%S)
+
+# ----------------------------------------------------------------------------------------
+# backup videos not yet archived that are unplayed within last 3 years
+echo  COPY_TO_S3 videos that are unplayed within last 3 years
+python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --s3copy
+#
+# replace backed-up  videos unplayed within last 3 years
+echo REPLACE backed-up  videos unplayed within last 3 years
+python src/kaltura_aws.py replace_video --unplayed_for 3 --tag archived_to_s3  --max_entries -1 --replace
+echo ""
+
+# ---------------------------------------------------------
+# print counts of videos that should but have not yet been archived and replaced
+echo  count of videos that should but have not yet been ARCHIVED
+python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3
+echo count of videos that should but have not yet been REPLACED
+python src/kaltura_aws.py count --unplayed_for 3 --tag \!flavors_deleted
+
+# ----------------------------------------------------------------------------------------
+# print report of videos that should but have not yet been archived
+echo "#Entries not played in 3 years but not ARCHIVED/REPLACED " > $tsv.tsv
+python src/kaltura_aws.py list  --unplayed_for 3 --tag \!archived_to_s3  --max_entries  -1 >> $tsv.tsv
+python src/kaltura_aws.py list  --unplayed_for 3 --tag \!flavors_deleted  --max_entries  -1 >> $tsv.tsv
+
+
+# ----------------------------------------------------------------------------------------
+# copy report to log in s3
+aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
