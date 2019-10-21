@@ -5,19 +5,25 @@ cd `dirname $0`
 max=25
 
 tag=restore-pending
+log=INFO
 log_dir=$(date +log/%Y/%m/%d)
 mkdir -p $log_dir
 tsv=$(date +$log_dir/$tag-%H:%M:%S)
-
 # ----------------------------------------------------------------------------------------
 # restore videos played or created within last 3 years -
 # the latter should not ever be the case but we might as well cleanup if errors occur
 #
 echo "restore deleted videos PLAYED within 3 YEARS"
-python src/kaltura_aws.py restore_from_s3 --restore --tag flavors_deleted --played_within 3 --max_entries $max
+cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max"
+echo $cmd 
+$cmd 
+
 echo "restore deleted videos CREATED within 3 YEARS"
-python src/kaltura_aws.py restore_from_s3 --restore  --tag flavors_deleted --created_within 3 --max_entries $max
+cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3  --tag flavors_deleted --created_within 3 --max_entries $max"
+echo $cmd 
+$cmd 
 echo ""
+
 # ---------------------------------------------------------
 # print counts of videos that should but have not yet been restored 
 #
@@ -35,7 +41,7 @@ echo ""
 python src/kaltura_aws.py  health --tag flavors_deleted --played_within 3 > $tsv
 python src/kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv
 # combine and clean up 
-echo "#Entries created or played within last 3 years that have a flavors-delted tag" >> $tsv.tsv
+echo "#Entries created or played within last 3 years that have a flavors-deleted tag" >> $tsv.tsv
 fgrep entry_id  $tsv | head -n 1 >> $tsv.tsv
 sort -u $tsv >> $tsv.tsv
 
