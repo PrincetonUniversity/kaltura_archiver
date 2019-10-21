@@ -313,7 +313,7 @@ The static event should look similar to this (use double not single quotes):
 The code in the python subdirectory runs only with Python v2.x, see [.python-version](.python-version)
 
 Please install pyenv according to  [github.com/pyenv/pyenv](https://github.com/pyenv/pyenv) 
-Pyenv alows you ti install a local python copy and python libraries 
+Pyenv allows you to install a local python copy and python libraries 
 which functions independently of the system version. 
 
 ~~~
@@ -327,14 +327,8 @@ python -V      # should return Python 2.7
 Install necessary packages 
 
 ~~~
-curl -O http://cdnbakmi.kaltura.com/content/clientlibs/python_02-03-2017.tar.gz
-pip install python_02-03-2017.tar.gz
-
-pip install poster 
-pip install boto3  --upgrade
-
-#optional - aws command line tools
-pip install awscli --upgrade
+pip install setuptools
+pip install -r src/requirements.txt 
 ~~~
 
 ## Versions 
