@@ -13,12 +13,12 @@ tsv=$(date +$log_dir/$tag-%H:%M:%S)
 # ----------------------------------------------------------------------------------------
 # backup videos not yet archived that are unplayed within last 3 years
 echo  COUNT videos that are unplayed within last 3 years without archived_to_s3 tag
-cmd="python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 "
+cmd="python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --s3copy"
 echo $cmd
 $cmd
 echo ""
 echo  COPY_TO_S3 videos that are unplayed within last 3 years without archived_to_s3 tag
-cmd="python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 "
+cmd="python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --replace"
 echo $cmd
 $cmd
 echo ""

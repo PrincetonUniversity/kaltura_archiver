@@ -14,12 +14,12 @@ tsv=$(date +$log_dir/$tag-%H:%M:%S)
 # the latter should not ever be the case but we might as well cleanup if errors occur
 #
 echo "restore deleted videos PLAYED within 3 YEARS"
-cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max"
+cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max --restore"
 echo $cmd 
 $cmd 
 
 echo "restore deleted videos CREATED within 3 YEARS"
-cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3  --tag flavors_deleted --created_within 3 --max_entries $max"
+cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3  --tag flavors_deleted --created_within 3 --max_entries $max --restore"
 echo $cmd 
 $cmd 
 echo ""
