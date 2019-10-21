@@ -335,3 +335,4 @@ pip install -r src/requirements.txt
 
 V1.0.0   kaltura archiver executing in docker 
 V1.1.0   kaltura archiver and restorer in same docker image 
+V1.1.1   INFO logging in restore.rc, ERROR logging in archive.rc, pip install -r src/requirements.txt
