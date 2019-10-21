@@ -5,18 +5,29 @@ cd `dirname $0`
 # max_entries  -1 <=> unlimited
 
 tag=unplayed-not-archived
+log=INFO
 log_dir=$(date +log/%Y/%m/%d)
 mkdir -p $log_dir
 tsv=$(date +$log_dir/$tag-%H:%M:%S)
 
 # ----------------------------------------------------------------------------------------
 # backup videos not yet archived that are unplayed within last 3 years
-echo  COPY_TO_S3 videos that are unplayed within last 3 years
-python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --s3copy
+echo  COUNT videos that are unplayed within last 3 years without archived_to_s3 tag
+cmd="python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --s3copy"
+echo $cmd
+$cmd
+echo ""
+echo  COPY_TO_S3 videos that are unplayed within last 3 years without archived_to_s3 tag
+cmd="python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --replace"
+echo $cmd
+$cmd
+echo ""
 #
 # replace backed-up  videos unplayed within last 3 years
 echo REPLACE backed-up  videos unplayed within last 3 years
-python src/kaltura_aws.py replace_video --unplayed_for 3 --tag archived_to_s3  --max_entries -1 --replace
+cmd="python src/kaltura_aws.py --loglevel $log replace_video --unplayed_for 3 --tag archived_to_s3  --max_entries -1 "
+echo $cmd
+$cmd
 echo ""
 
 # ---------------------------------------------------------
@@ -25,6 +36,7 @@ echo  count of videos that should but have not yet been ARCHIVED
 python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3
 echo count of videos that should but have not yet been REPLACED
 python src/kaltura_aws.py count --unplayed_for 3 --tag \!flavors_deleted
+echo ""
 
 # ----------------------------------------------------------------------------------------
 # print report of videos that should but have not yet been archived
