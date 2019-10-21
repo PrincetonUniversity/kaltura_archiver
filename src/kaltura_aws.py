@@ -690,10 +690,10 @@ def list(params):
     _setup(params, None)
     filter = _create_filter(params)
     if (params['mode'] == 'video'):
-        columns = [kaltura.LAST_PLAYED_DATE, kaltura.LAST_PLAYED, kaltura.PLAYS,
+        columns = [kaltura.LAST_PLAYED_DATE, kaltura.PLAYS,
                    kaltura.ENTRY_ID, kaltura.STATUS,  SAVED_TO_S3, PLACE_HOLDER_VIDEO,
-                   kaltura.TOTAL_SIZE, kaltura.ORIGINAL_SIZE, kaltura.ORIGINAL_STATUS,
-                   kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID]
+                   kaltura.CREATED_AT_DATE, kaltura.CREATED_AT, kaltura.CREATOR_ID,
+                   kaltura.CATEGORIES_IDS, kaltura.CATEGORIES]
         print('\t'.join(columns))
         for entry in filter:
             kentry = kaltura.MediaEntry(entry)
@@ -701,7 +701,6 @@ def list(params):
             print("\t".join(v.decode('utf-8') for v in vals))
     else:
         columns = [kaltura.ENTRY_ID, kaltura.FLAVOR_ID, kaltura.ORIGINAL, kaltura.SIZE,
-                   kaltura.CREATED_AT, kaltura.DELETED_AT,
                    kaltura.CREATED_AT_DATE, kaltura.DELETED_AT_DATE,
                    kaltura.STATUS]
         print('\t'.join(columns))
