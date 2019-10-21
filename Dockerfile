@@ -8,23 +8,19 @@ RUN apk --no-cache update && \
     # Install python2 and pip
     apk add --no-cache python2 && \
     python2 -m ensurepip && \
-    pip2 install --upgrade pip setuptools && \
-    # Install AWS SDK
-    pip2 install --no-cache-dir  boto3 awscli && \
-    # Install Kaltura SDK
-    pip2 install --no-cache-dir KalturaApiClient==3.3.1
-RUN pip2  uninstall -y pip setuptools
+    pip2 install --upgrade pip setuptools
+ADD src/requirements.txt /tmp
+RUN pip2 install -r /tmp/requirements.txt
 
 FROM alpine:latest
 # bash used in *.rc scripts
 RUN apk add --no-cache bash
 # reinstall python2
 RUN apk add  --no-cache  python2
-# copy packagesinstalled by pip
+
+# copy packages installed by pip in build image along with commands
 RUN mkdir /site-packages
 COPY --from=build  /usr/lib/python2.7/site-packages /site-packages
-ENV PYTHONPATH /site-packages
-# copy aws command
 COPY --from=build  /usr/bin/aws*  /usr/bin/
 
 WORKDIR /data
@@ -41,6 +37,7 @@ ADD .git/refs/heads /git
 RUN sed 's,.*/,,' HEAD > /data/BRANCH
 RUN cat `cat /data/BRANCH`  > /data/COMMIT-HASH
 
+ENV PYTHONPATH /site-packages
 WORKDIR /data
 
 
