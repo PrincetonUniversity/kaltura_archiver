@@ -208,12 +208,15 @@ class FilterIter:
     def next(self):
         if (self.max_iter  == 0):
             raise StopIteration()
-
+        n = None
         try:
-            return self._next()
+            n = self._next()
         except StopIteration as stp:
             self._next_batch()
-            return self._next()
+            n = self._next()
+        api.logger.debug("Filter.next -> %s" % n.getId())
+        return n
+
 
     def _next_batch(self):
         self.pager.setPageIndex(self.pager.getPageIndex() + 1)
