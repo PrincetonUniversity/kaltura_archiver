@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import unittest
 
+from KalturaClient.Base import IKalturaLogger
 from  kaltura_aws import KalturaArgParser, _init_loggers
 import kaltura
 import envvars
@@ -19,7 +20,7 @@ class TestKaltura(unittest.TestCase):
     # assuming its OK to change stuff in the Test KMC
     # IDs below are assumed to be in the test KMC
     # if test fail follow up tests may start in unexpected scenarios
-    TEST_KALTURA_PARTNER_ID = 11111
+    TEST_KALTURA_PARTNER_ID = 336061
 
     TEST_ID_1 = '1_tza6webs'
 

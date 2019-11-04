@@ -1,4 +1,4 @@
 boto3
 awscli
 poster 
-http://cdnbakmi.kaltura.com/content/clientlibs/python_02-03-2017.tar.gz
+https://github.com/kaltura/KalturaGeneratedAPIClientsPython/archive/v15.10.0.tar.gz
