@@ -3,7 +3,7 @@ Kaltura
 
 The script [kaltura_aws.py](kaltura_aws.py) is the main script to be run. 
 
-It lists, archives and restores videos in Kaltura.  
+It lists, archives, restores videos in Kaltura.   
 It relies on environment variables to authenticate against the Kaltura KMC  and AWS. 
 Start with  the template files  [bash.rc](bash.rc) and [csh.rc](csh.rc) to set the relevant environment variables. 
 
@@ -12,6 +12,9 @@ Use the help option for further documentation
 ~~~
 python kaltura_aws.py --help 
 ~~~
+
+In production we run te script in a Docker container under AWS Fargate, Please read more about this at 
+[README-AWS.md](README-AWS.md)
 
 ## Archiving Videos Workflow 
 
@@ -53,7 +56,7 @@ In the archived state:
 
 
 In the  place_holder state: 
-  1. s3 contain a copy of the entry's real original flavor -- same as archived state
+  1. s3 contains a copy of the entry's real original flavor -- same as archived state
   2. entry has  the 'archived_to_s3' tag -- same as archived state
   3. entry has the 'deleted_flavors' tag 
   4. its original flavor is the place holder video 
@@ -125,7 +128,7 @@ if the entry does not have 'flavors_deleted' and has 'archived_to_s3' tag
 to archive and replace with the place holder video choose a filter option 
 that captures the videos you want to work on, then do: 
 ~~~
-kaltura_aws.py  s3copy   [fiOlter-options]
+kaltura_aws.py  s3copy   [filter-options]
 kaltura_aws.py  replace_video [filter-options]
 kaltura_aws.py  health [filter-options]
 ~~~
@@ -230,83 +233,9 @@ Look for entries with a valid uid and with no pususpended value; in addition to 
 ~~~
 ldapsearch -LLL -x -H "ldaps://$LDAP_SERVER/" -b "o=Princeton University,c=US" -D "uid=NETID,o=princeton university,c=us" -W '(&(uid=*)(!(pususpended=*)))' uid puresource
 ~~~
-
-
-
-## Docker  
-
-
-Build Docker image and tag it with a name 
-~~~
-docker build --tag IMAGE_NAME .
-~~~
-
-Run script in a container 
-
-~~~
-docker run --env-file env.list  IMAGE_NAME  './restore.rc'
-docker run --env-file env.list  IMAGE_NAME  './archive.rc'
-~~~
-
-where envlist is formatted as 
-
-~~~
-KALTURA_USERID=NETID@princeton.edu \
-KALTURA_PARTNERID=P-ID \
-KALTURA_SECRET=P-SECRET \
-AWS_ACCESS_KEY_ID=A-ID \
-AWS_SECRET_ACCESS_KEY=A-KEY \
-AWS_BUCKET=BUCKET-NAME \
-PLACEHOLDER_VIDEO=placeholder_video.mp4 \
-~~~
-
-### Locally Test Docker Image 
-
-~~~
-docker build -t test .
-
-# list info on test image
-docker images test 
-
-# start container and enter sh 
-docker run --env-file env.list -i -t test sh
-~~~
-
-## AWS 
-
-We run the current code in the CISDR-ADMIN account in AWS 
-
-The code is excuted by running in a task that uses a docker container.
-
-The related docker image is defined in the ECS `fargate-cluster`, 
-which contains the `kaltura-restores` repository. 
-The repository is where the latest Docker image based on the local [Dockerfile](./Dockerfile) is uploaded. 
-The push commands are listed on the repository page in the AWS console and should be the same as used by the command:
-~~~
-docker_push
-~~~
-
-ECS also contains `kaltura-restores` Task definition, which encapsulate the docker image to be run as well as 
-environment variables to be passed to a container execution. 
-
-A  `trigger-kaltura-restore` CloudWatch Rule triggers the execution of the  `kaltura-restore` Lambda function, 
-which starts a Task executions. 
-The Lambda function uses the [docker_run_task.py](./docker_run_task.py)  code.
-The Rule defines a static event to be passed to the Lambda function, 
-that describes which Task to run, where to run, ... 
-The static event should look similar to this (use double not single quotes): 
-~~~ 
-{ 
-    "cluster": "fargate-cluster",
-    "platformVersion": "LATEST",
-    "securityGroup": "sg-xxxxxxxx,
-    "subnet": ["subnet-xxxxxxxx],
-    "taskName": "kaltura-restores:VERSION_ID"
-}
-~~~ 
  
 
-## Installation
+## Installation for local development
 
 ### Python and Packages 
 
@@ -334,5 +263,7 @@ pip install -r src/requirements.txt
 ## Versions 
 
 V1.0.0   kaltura archiver executing in docker 
+
 V1.1.0   kaltura archiver and restorer in same docker image 
+
 V1.1.1   INFO logging in restore.rc, ERROR logging in archive.rc, pip install -r src/requirements.txt
