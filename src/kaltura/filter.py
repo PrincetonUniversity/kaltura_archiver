@@ -70,14 +70,6 @@ class Filter:
 			api.logger.debug("Filter.entryId: NOOP ")
 		return self
     
-	def _search_for_compare(self, field, op, value):
-		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
-		search_for.fieldName = field
-		search_for.itemType = op
-		search_for.searchTerm = value
-		self.search_params.searchOperator.searchItems.append(search_for)
-		api.logger.debug("Filter.%s %s %s" % (str(field), self.KalturaESearchItem_OPERATOR_STR[op], str(value)))
-
 	def status(self, status):
 		"""
 		filter on KalturaEntryStatus constant
@@ -204,8 +196,23 @@ class Filter:
 	def __iter__(self):
 		return FilterIter(self)
 
+	def _search_for_compare(self, field, op, value):
+		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
+		search_for.fieldName = field
+		search_for.itemType = op
+		search_for.searchTerm = value
+		self.search_params.searchOperator.searchItems.append(search_for)
+		api.logger.debug("Filter + %s" %  self._repr_search_entry_item(search_for))
+
+	def _repr_search_entry_item(self, search_for):
+		return "%s %s %s" % (str(search_for.fieldName),
+							 self.KalturaESearchItem_OPERATOR_STR[search_for.itemType], str(search_for.searchTerm))
+
 	def __str__(self):
-		properties = "??"
+		properties = ""
+		for si in self.search_params.searchOperator.searchItems:
+			properties += " [%s]" % self._repr_search_entry_item(si)
+		properties = properties.strip()
 		return "Filter({}, [page:{} len:{} max={}])".format(properties, self.page, self.per_page, self.maximum_iter)
 
 	def __repr__(self):
