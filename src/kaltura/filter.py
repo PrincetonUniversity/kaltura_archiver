@@ -20,8 +20,11 @@ class Filter:
 		KalturaESearchItemType.EXACT_MATCH : "==",
 		KalturaESearchItemType.STARTS_WITH : "starts-with",
 		KalturaESearchItemType.EXISTS : "exists",
-		KalturaESearchItemType.PARTIAL : "~~"
+		KalturaESearchItemType.PARTIAL : "~~",
+		KalturaESearchItemType.RANGE : ""
 	}
+
+
 
 	def __init__(self, mediaType='video'):
 		self.search_params = KalturaESearchEntryParams()
@@ -172,14 +175,16 @@ class Filter:
 		:return: self
 		"""
 		if years is not None:
+			range = KalturaESearchRange()
 			since = Filter._years_ago(years)
 			if (mode == 'lastPlayedAtLessThanOrEqual'):
-				self.filter.lastPlayedAtLessThanOrEqual = since
+				range.lessThanOrEqual = since
 			elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
-				self.filter.lastPlayedAtGreaterThanOrEqual = since
-			api.logger.debug("Filter.{:s} {:s}".format(mode, api.dateString(since)))
+				range.greaterThanOrEqual = since
+			self._search_for_compare(KalturaESearchEntryFieldName.LAST_PLAYED_AT, KalturaESearchItemType.RANGE, range)
 		else:
 			api.logger.debug("Filter.{:s}: NOOP".format(mode))
+
 		return self
 
 
@@ -200,13 +205,25 @@ class Filter:
 		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
 		search_for.fieldName = field
 		search_for.itemType = op
-		search_for.searchTerm = value
+		if op == KalturaESearchItemType.RANGE:
+			search_for.range = value
+		else:
+			search_for.searchTerm = value
 		self.search_params.searchOperator.searchItems.append(search_for)
 		api.logger.debug("Filter + %s" %  self._repr_search_entry_item(search_for))
 
 	def _repr_search_entry_item(self, search_for):
-		return "%s %s %s" % (str(search_for.fieldName),
-							 self.KalturaESearchItem_OPERATOR_STR[search_for.itemType], str(search_for.searchTerm))
+		op = ""
+		value = ""
+		if (search_for.itemType != KalturaESearchItemType.RANGE):
+			op = self.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
+			value = search_for.searchTerm
+		elif (search_for.range):
+				op_value = vars(search_for.range)
+				for rop in op_value.keys():
+					if op_value[rop] != NotImplemented:
+						op +=  "(%s %s) " % (rop, op_value[rop])
+		return "%s %s %s" % (str(search_for.fieldName), op, str(value))
 
 	def __str__(self):
 		properties = ""
