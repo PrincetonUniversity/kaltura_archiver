@@ -10,22 +10,37 @@ class Filter:
 	MAX_PAGE_SIZE = 500
 	ENTRY_STATUS_READY = KalturaEntryStatus.READY
 	ORDER_BY = "+createdAt"  # oldest first
+	MEDIA_TYPES = {
+		'video' : KalturaMediaType.VIDEO,
+		'image' : KalturaMediaType.IMAGE,
+		'audio' : KalturaMediaType.AUDIO
+	}
 
-	def __init__(self, mediaType=KalturaMediaType.VIDEO):
+	KalturaESearchItem_OPERATOR_STR = {
+		KalturaESearchItemType.EXACT_MATCH : "==",
+		KalturaESearchItemType.STARTS_WITH : "starts-with",
+		KalturaESearchItemType.EXISTS : "exists",
+		KalturaESearchItemType.PARTIAL : "~~"
+	}
+
+	def __init__(self, mediaType='video'):
 		self.search_params = KalturaESearchEntryParams()
 		self.search_params.aggregations = KalturaESearchAggregation()
 		self.search_params.searchOperator = KalturaESearchEntryOperator()
 		self.search_params.searchOperator.operator = KalturaESearchOperatorType.AND_OP
 		self.search_params.searchOperator.searchItems = []
+		self._search_for_compare(KalturaESearchEntryFieldName.MEDIA_TYPE,
+												KalturaESearchItemType.EXACT_MATCH,
+											   			self.MEDIA_TYPES[mediaType])
 
-		#TODO self.filter.mediaTypeEqual = mediaType
+
 		#TODO self.filter.orderBy = Filter.ORDER_BY
 		self.page  = 1
 		self.per_page  = Filter.MAX_PAGE_SIZE
 		self.maximum_iter = -1  # no limit
 
 	def first_page(self, page):
-		self.pager.pageIndex= page
+		self.page = page
 		return self
 
 	def page_size(self, size):
@@ -49,15 +64,19 @@ class Filter:
 		:return: self
 		"""
 		if entryid is not None:
-			search_for = KalturaESearchEntryItem()
-			search_for.fieldName = KalturaESearchEntryFieldName.ID
-			search_for.itemType = KalturaESearchItemType.EXACT_MATCH
-			search_for.searchTerm = id
-			self.search_params.searchOperator.searchItems.append(search_for)
-			api.logger.debug("Filter.id=%s" % search_for.searchTerm)
+			self._search_for_compare(KalturaESearchEntryFieldName.ID,
+												   KalturaESearchItemType.EXACT_MATCH, entryid)
 		else:
 			api.logger.debug("Filter.entryId: NOOP ")
 		return self
+    
+	def _search_for_compare(self, field, op, value):
+		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
+		search_for.fieldName = field
+		search_for.itemType = op
+		search_for.searchTerm = value
+		self.search_params.searchOperator.searchItems.append(search_for)
+		api.logger.debug("Filter.%s %s %s" % (str(field), self.KalturaESearchItem_OPERATOR_STR[op], str(value)))
 
 	def status(self, status):
 		"""
@@ -219,11 +238,11 @@ class FilterIter:
 		self.last_results = api.getClient().elasticSearch.eSearch.searchEntry(self.filter.search_params, self.pager)
 		if (self.last_results.objects):
 			api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
-			self.object_iter = iter(self.last_result.objects)
+			self.object_iter = iter(self.last_results.objects)
 		else:
 			self.object_iter = iter([])
 
 	def _next(self):
 		n = next(self.object_iter)
 		self.max_iter -= 1
-		return n;
+		return n.object

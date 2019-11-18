@@ -21,7 +21,6 @@ YEARS_SINCE_CREATION_FOR_REPLACE = 3
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4".split(",")
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
-
 # if waiting for uploaded video's original flavor to reach READY status   - sleep for POLL_READY_WAIT sec in between checks
 POLL_READY_WAIT = 10
 
@@ -130,6 +129,9 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--plays",  help="number of video plays")
         subparser.add_argument("--status",   nargs='*', default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, ' '.join(DEFAULT_STATUS_LIST)))
 
+        media_types  = kaltura.Filter.MEDIA_TYPES.keys()
+        subparser.add_argument("--media_type, 'm'",  default=media_types[0], choices = media_types, help="media type, default = {}".format(media_types[0]))
+
         subparser.add_argument("--created_within",  type=int, help="creation date lies within the given number years");
         subparser.add_argument("--created_before",   type=int, help="creation date longer than the given number of years ago");
         subparser.add_argument("--played_within", "-p",  type=int, help="played within the the given number of years")
@@ -151,14 +153,14 @@ def _create_filter(params):
         filter = kaltura.Filter()
         if ('id' in params):
             filter.entry_id(params['id'])
-        if False and 'status' in params:
+        if 'status' in params:
             # implies all the other params are there too
             # see ArgParser
-            filter.tag(params['tag'])
-            filter.category(params['category'])
-            filter.status(','.join(params['status'])).plays_equal(params['plays'])
-            filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
-            filter.created_wthin_years(params['created_within']).years_since_created(params['created_before'])
+            #filter.tag(params['tag'])
+            #filter.category(params['category'])
+            #filter.status(','.join(params['status'])).plays_equal(params['plays'])
+            #filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
+            #filter.created_wthin_years(params['created_within']).years_since_created(params['created_before'])
             filter.first_page(params['first_page']).page_size(params['page_size'])
             filter.max_iter(params['max_entries'])
         if (params['func'] == replace_videos):
