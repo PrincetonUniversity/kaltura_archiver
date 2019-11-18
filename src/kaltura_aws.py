@@ -151,7 +151,7 @@ def _create_filter(params):
         filter = kaltura.Filter()
         if ('id' in params):
             filter.entry_id(params['id'])
-        if 'status' in params:
+        if False and 'status' in params:
             # implies all the other params are there too
             # see ArgParser
             filter.tag(params['tag'])
