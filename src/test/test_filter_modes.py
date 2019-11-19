@@ -14,6 +14,24 @@ class TestFilterModes(TestKaltura):
         l = sum(1 for _ in filter)
         self.assertEqual(l, 7)
 
+    def test_filter_entry_id(self):
+        filter = kaltura.Filter().entry_id(TestKaltura.TEST_ID_1)
+        l = sum(1 for _ in filter)
+        self.assertEqual(l, 1)
+
+    def test_filter_entry_id_get_count(self):
+        filter = kaltura.Filter().entry_id(TestKaltura.TEST_ID_1)
+        self.assertEqual(filter.get_count(), 1)
+
+    def test_filter_bad_entry_id(self):
+        filter = kaltura.Filter().entry_id(TestKaltura.TEST_ID_1 + "BAD")
+        l = sum(1 for _ in filter)
+        self.assertEqual(l, 0)
+
+    def test_filter_bad_entry_id_get_count(self):
+        filter = kaltura.Filter().entry_id(TestKaltura.TEST_ID_1 + "BAD")
+        self.assertEqual(filter.get_count(), 0)
+
     def test_filter_played_within(self):
         filter = kaltura.Filter().played_within_years(3).page_size(10).max_iter(10)
         l = sum(1 for _ in filter)
