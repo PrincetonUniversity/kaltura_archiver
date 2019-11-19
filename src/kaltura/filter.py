@@ -24,7 +24,11 @@ class Filter:
 		KalturaESearchItemType.RANGE : ""
 	}
 
-
+	KalturaESearch_OPERATOR_STR = {
+		KalturaESearchOperatorType.NOT_OP : "NOT",
+		KalturaESearchOperatorType.AND_OP : "AND",
+		KalturaESearchOperatorType.OR_OP : "OR"
+	}
 
 	def __init__(self, mediaType='video'):
 		self.search_params = KalturaESearchEntryParams()
@@ -32,11 +36,11 @@ class Filter:
 		self.search_params.searchOperator = KalturaESearchEntryOperator()
 		self.search_params.searchOperator.operator = KalturaESearchOperatorType.AND_OP
 		self.search_params.searchOperator.searchItems = []
-		self._search_for_compare(KalturaESearchEntryFieldName.MEDIA_TYPE,
-												KalturaESearchItemType.EXACT_MATCH,
-											   			self.MEDIA_TYPES[mediaType])
+		self._search_for_entry(KalturaESearchEntryFieldName.MEDIA_TYPE,
+							   KalturaESearchItemType.EXACT_MATCH,
+							   self.MEDIA_TYPES[mediaType])
 
-
+		self.tag_esearch_entry = None
 		#TODO self.filter.orderBy = Filter.ORDER_BY
 		self.page  = 1
 		self.per_page  = Filter.MAX_PAGE_SIZE
@@ -67,8 +71,8 @@ class Filter:
 		:return: self
 		"""
 		if entryid is not None:
-			self._search_for_compare(KalturaESearchEntryFieldName.ID,
-												   KalturaESearchItemType.EXACT_MATCH, entryid)
+			self._search_for_entry(KalturaESearchEntryFieldName.ID,
+								   KalturaESearchItemType.EXACT_MATCH, entryid)
 		else:
 			api.logger.debug("Filter.entryId: NOOP ")
 		return self
@@ -99,19 +103,26 @@ class Filter:
 		:return: self
 		"""
 		if (tag != None):
-			if (self.filter.advancedSearch != NotImplemented):
-				raise RuntimeError("tag: filter.advancedSearch already defined")
-			tagfilter = KalturaMediaEntryMatchAttributeCondition()
-			# if tag start with '|' look for non matching entries
+			if (self.tag_esearch_entry):
+				raise RuntimeError("tag: already defined")
+
+
 			if tag.startswith("!"):
-				tagfilter.not_ = True
-				tagfilter.value = tag[1:]
+				search_entry = self._kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+														  KalturaESearchItemType.PARTIAL,
+														  tag[1:])
+				# must wrap a NOT operator around tag search_entry
+				not_op = KalturaESearchEntryOperator()
+				not_op.operator = KalturaESearchOperatorType.NOT_OP
+				not_op.searchItems = [search_entry]
+				search_entry = not_op
 			else:
-				tagfilter.not_ = False
-				tagfilter.value = tag
-			tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
-			self.filter.advancedSearch = tagfilter
-			api.logger.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
+				search_entry = self._kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+														  KalturaESearchItemType.PARTIAL,
+														  tag)
+			self.search_params.searchOperator.searchItems.append(search_entry)
+			api.logger.debug('Filter.tag={}'.format(tag))
+
 		return self
 
 	def plays_equal(self, plays):
@@ -180,7 +191,7 @@ class Filter:
 				range.greaterThan = since
 			else:
 				raise RuntimeError("mode {} not in [{}, {}]".format(mode, 'lessThanOrEqual', 'greaterThan'))
-			self._search_for_compare(field_name, KalturaESearchItemType.RANGE, range)
+			self._search_for_entry(field_name, KalturaESearchItemType.RANGE, range)
 		else:
 			api.logger.debug("Filter.{}{:s}: NOOP".format(field_name, mode))
 
@@ -199,7 +210,13 @@ class Filter:
 	def __iter__(self):
 		return FilterIter(self)
 
-	def _search_for_compare(self, field, op, value):
+	def _search_for_entry(self, field, op, value):
+		search_for = self._kaltura_search_entry(field, op, value)
+		self.search_params.searchOperator.searchItems.append(search_for)
+		api.logger.debug("Filter + %s" %  self._repr_search_entry_item(search_for))
+
+	@staticmethod
+	def _kaltura_search_entry(field, op, value):
 		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
 		search_for.fieldName = field
 		search_for.itemType = op
@@ -207,31 +224,41 @@ class Filter:
 			search_for.range = value
 		else:
 			search_for.searchTerm = value
-		self.search_params.searchOperator.searchItems.append(search_for)
-		api.logger.debug("Filter + %s" %  self._repr_search_entry_item(search_for))
-
-	def _repr_search_entry_item(self, search_for):
-		op = ""
-		value = ""
-		if (search_for.itemType != KalturaESearchItemType.RANGE):
-			op = self.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
-			value = search_for.searchTerm
-		elif (search_for.range):
-				op_value = vars(search_for.range)
-				for rop in op_value.keys():
-					if op_value[rop] != NotImplemented:
-						op +=  "(%s %s) " % (rop, op_value[rop])
-		return "%s %s %s" % (str(search_for.fieldName), op, str(value))
+		return search_for
 
 	def __str__(self):
-		properties = ""
-		for si in self.search_params.searchOperator.searchItems:
-			properties += " [%s]" % self._repr_search_entry_item(si)
-		properties = properties.strip()
-		return "Filter({}, [page:{} len:{} max={}])".format(properties, self.page, self.per_page, self.maximum_iter)
+		searcher =  self._repr_search_operator(self.search_params.searchOperator)
+		return "Filter({}, [page:{} len:{} max={}])".format(searcher, self.page, self.per_page, self.maximum_iter)
 
 	def __repr__(self):
 		return str(self)
+
+
+	@staticmethod
+	def _repr_search_operator(search_op):
+		op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
+		properties = ""
+		for si in search_op.searchItems:
+			properties += " [%s]" % Filter._repr_search_entry_item(si)
+		return "{}({} )".format(op_str, properties)
+
+	@staticmethod
+	def _repr_search_entry_item( search_for):
+		if isinstance(search_for, KalturaESearchEntryOperator):
+			return Filter._repr_search_operator(search_for)
+		op = ""
+		value = ""
+		if (search_for.itemType != KalturaESearchItemType.RANGE):
+			op = Filter.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
+			value = search_for.searchTerm
+		elif (search_for.range):
+			op_value = vars(search_for.range)
+			for rop in op_value.keys():
+				if op_value[rop] != NotImplemented:
+					op +=  "(%s %s) " % (rop, op_value[rop])
+		return "%s %s %s" % (str(search_for.fieldName), op, str(value))
+
+
 
 
 class FilterIter:

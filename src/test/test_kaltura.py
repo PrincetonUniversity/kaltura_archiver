@@ -5,6 +5,7 @@ from KalturaClient.Base import IKalturaLogger
 from  kaltura_aws import KalturaArgParser, _init_loggers
 import kaltura
 import envvars
+
 from KalturaClient.Plugins.Core import *
 import random
 import sys
@@ -29,6 +30,9 @@ class TestKaltura(unittest.TestCase):
 
     # this entry has no ORIGINAL
     TEST_ID_NO_ORIGINAL = '1_cmnbl3za'
+
+    # this TAG=python_test  + other tags
+    TEST_TAG_PYTHON_TEST = '1_nkc7nbgs'
 
     @classmethod
     def setUpClass(cls):

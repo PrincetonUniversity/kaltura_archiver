@@ -57,14 +57,6 @@ class TestKalturaAwsCli(TestKaltura):
             rc = kaltura_aws._main(argv)
             self.assertNotEqual(rc, 0)
 
-    def testa_download(self):
-            argv = ['download', '-i', self.entry_id]
-            rc = kaltura_aws._main(argv)
-            self.assertEqual(rc, 0)
-            # check not empty
-            self.assertGreater(os.stat(self.entry_id + ".mp4").st_size, 0)
-            os.remove(self.entry_id + ".mp4")
-
     def testa_list(self):
         argv = ['list', '--max_entries', '3']
         rc = kaltura_aws._main(argv)
@@ -84,6 +76,24 @@ class TestKalturaAwsCli(TestKaltura):
         argv = ['list', '--unplayed_for', '1', '--played_within', '3', '--max_entries', '1']
         rc = kaltura_aws._main(argv)
         self.assertEqual(rc, 0)
+
+    def testa_list_tag_is(self):
+        argv = ['list', '--tag', 'archived_to_s3', '--max_entries', '1']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+
+    def testa_list_not_tag_is(self):
+        argv = ['list', '--tag', '!archived_to_s3', '--max_entries', '1']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+
+    def testab_download(self):
+        argv = ['download', '-i', self.entry_id]
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+        # check not empty
+        self.assertGreater(os.stat(self.entry_id + ".mp4").st_size, 0)
+        os.remove(self.entry_id + ".mp4")
 
     def testb_replace_video_without_s3copy(self):
             argv = ['replace_video', '-i', self.entry_id]
