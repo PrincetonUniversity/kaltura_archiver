@@ -212,10 +212,16 @@ stats.py
 
 ## Execute Tests 
 
-set environment variabes so code connects to TEST KMC, then run: 
+set environment variabes so code connects to TEST KMC, then run in project's top directory  
 
 ~~~
-python -m unittest discover -v test
+setenv PYTHONPATH src
+python -m unittest discover -v src/test
+~~~
+
+to run individual tests do something along these lines: 
+~~~
+python src/test/test_kaltura_aws.py TestKalturaAwsCli.testa_list_played_within_unplayed_for
 ~~~
 
 
