@@ -4,11 +4,12 @@ import os, sys
 
 from test_kaltura import TestKaltura
 import kaltura
+import kaltura_aws
+
 from kaltura import aws
 
 # these test rely on alphabetical execution of test cases
 
-import kaltura_aws
 
 class TestKalturaAwsCli(TestKaltura):
     @classmethod
@@ -20,7 +21,9 @@ class TestKalturaAwsCli(TestKaltura):
         if (kaltura.MediaEntry(entry).getOriginalFlavor().getSize() < 350):
             print("ABORT: based on size ORIGINAL FLAVOR seems to be replacement video")
             sys.exit(1)
-        assert(not entry.getTags())
+        if entry.getTags():
+            print("ABORT: entry {} has tags - probably left over from previous run failures".format(TestKalturaAwsCli.entry_id))
+            sys.exit(1)
         assert(not aws.s3_exists(TestKalturaAwsCli.entry_id, TestKaltura.bucket))
 
     @classmethod
@@ -63,9 +66,24 @@ class TestKalturaAwsCli(TestKaltura):
             os.remove(self.entry_id + ".mp4")
 
     def testa_list(self):
-            argv = ['list', '-n', '-M', '2']
-            rc = kaltura_aws._main(argv)
-            self.assertEqual(rc, 0)
+        argv = ['list', '--max_entries', '3']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+
+    def testa_list_played_within(self):
+        argv = ['list', '--played_within', '5', '--max_entries', '2']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+
+    def testa_list_unplayed_for(self):
+        argv = ['list', '--unplayed_for', '1', '--max_entries', '1']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
+
+    def testa_list_played_within_unplayed_for(self):
+        argv = ['list', '--unplayed_for', '1', '--played_within', '3', '--max_entries', '1']
+        rc = kaltura_aws._main(argv)
+        self.assertEqual(rc, 0)
 
     def testb_replace_video_without_s3copy(self):
             argv = ['replace_video', '-i', self.entry_id]
