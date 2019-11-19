@@ -83,10 +83,10 @@ class Filter:
 		:param status:
 		:return:
 		"""
-		if self.filter.statusIn == NotImplemented:
-			self.filter.statusIn = str(status)
+		if self.search_params.objectStatuses == NotImplemented:
+			self.search_params.objectStatuses = str(status)
 		else:
-			self.filter.statusIn += ",{}".format(status)
+			self.search_params.objectStatuses += ",{}".format(status)
 		return self
 
 	def tag(self, tag):
@@ -207,7 +207,7 @@ class Filter:
 
 	def __str__(self):
 		searcher =  _repr_search_operator(self.search_params.searchOperator)
-		return "Filter({}, [page:{} len:{} max={}])".format(searcher, self.page, self.per_page, self.maximum_iter)
+		return "Filter({}, statusIn={}, [page:{} len:{} max={}])".format(searcher, self.search_params.objectStatuses, self.page, self.per_page, self.maximum_iter)
 
 	def __repr__(self):
 		return str(self)

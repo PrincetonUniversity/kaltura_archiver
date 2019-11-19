@@ -100,5 +100,13 @@ class TestFilterModes(TestKaltura):
         for e in  filter:
             self.assertFalse('archived_to_s3' in  e.tags.split(', '))
 
+    def test_filter_status(self):
+        filter = kaltura.Filter().status("2,7")
+        sfilter = str(filter)
+        print(sfilter)
+        for e in  filter:
+            self.assertTrue(e.getStatus().getValue() in ["2", "7"])
+
+
 if __name__ == '__main__':
     unittest.main()
