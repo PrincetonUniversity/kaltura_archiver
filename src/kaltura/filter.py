@@ -125,15 +125,11 @@ class Filter:
 
 		return self
 
-	def plays_equal(self, plays):
+	def plays_lt(self, plays):
 		if (plays != None):
-			if (self.filter.advancedSearch != NotImplemented):
-				raise RuntimeError("playsEqual: filter.advancedSearch already defined")
-			self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-			self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.PLAYS
-			self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.EQUAL
-			self.filter.advancedSearch.value = plays
-			api.logger.debug("Filter.playsEqual== {}".format(plays))
+			self._compare_range(KalturaESearchEntryFieldName.PLAYS,
+								"lessThan",
+								plays)
 		return self
 
 	def category(self, categoryId):
@@ -151,16 +147,16 @@ class Filter:
 		return self
 
 	def years_since_played(self, years):
-		return self._since_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'lessThanOrEqual', years)
+		return self._compare_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'lessThanOrEqual', _years_ago(years))
 
 	def played_within_years(self, years):
-		return self._since_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'greaterThan', years)
+		return self._compare_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'greaterThan', _years_ago(years))
 
 	def years_since_created(self, years):
-		return self._since_range(KalturaESearchEntryFieldName.CREATED_AT, 'lessThanOrEqual', years)
+		return self._compare_range(KalturaESearchEntryFieldName.CREATED_AT, 'lessThanOrEqual', _years_ago(years))
 
 	def created_within_years(self, years):
-		return self._since_range(KalturaESearchEntryFieldName.CREATED_AT, 'greaterThan', years)
+		return self._compare_range(KalturaESearchEntryFieldName.CREATED_AT, 'greaterThan', _years_ago(years))
 
 
 	def get_count(self):
@@ -172,7 +168,7 @@ class Filter:
 		"""
 		return iter(self).last_results.totalCount
 
-	def _since_range(self, field_name, mode, years):
+	def _compare_range(self, field_name, mode, since):
 		"""
 		match if video was was not last played since /within the last years
 
@@ -182,11 +178,12 @@ class Filter:
 		:param years: number of years
 		:return: self
 		"""
-		if years is not None:
+		if since is not None:
 			range = KalturaESearchRange()
-			since = _years_ago(years)
 			if (mode == 'lessThanOrEqual'):
 				range.lessThanOrEqual = since
+			elif (mode == 'lessThan'):
+				range.lessThan = since
 			elif (mode == 'greaterThan'):
 				range.greaterThan = since
 			else:
@@ -207,10 +204,18 @@ class Filter:
 
 	def __str__(self):
 		searcher =  _repr_search_operator(self.search_params.searchOperator)
-		return "Filter({}, statusIn={}, [page:{} len:{} max={}])".format(searcher, self.search_params.objectStatuses, self.page, self.per_page, self.maximum_iter)
+		return "Filter({}, status:{}, [page:{} len:{} max={}])".format(searcher, self.search_params.objectStatuses, self.page, self.per_page, self.maximum_iter)
 
 	def __repr__(self):
 		return str(self)
+
+
+def _repr_search_operator(search_op):
+	op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
+	properties = ""
+	for si in search_op.searchItems:
+		properties += " [%s]" % _repr_search_entry_item(si)
+	return "{}({} )".format(op_str, properties)
 
 
 def _repr_search_entry_item( search_for):
@@ -226,15 +231,7 @@ def _repr_search_entry_item( search_for):
 		for rop in op_value.keys():
 			if op_value[rop] != NotImplemented:
 				op +=  "(%s %s) " % (rop, op_value[rop])
-	return "%s %s %s" % (str(search_for.fieldName), op, str(value))
-
-
-def _repr_search_operator(search_op):
-	op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
-	properties = ""
-	for si in search_op.searchItems:
-		properties += " [%s]" % _repr_search_entry_item(si)
-	return "{}({} )".format(op_str, properties)
+	return ("%s %s %s" % (str(search_for.fieldName), op, str(value))).strip()
 
 
 def _years_ago(years):
@@ -243,9 +240,11 @@ def _years_ago(years):
 	:return: return   unix standard time of now() - years
 
 	"""
-	d = datetime.now() - relativedelta(years=years)
-	return int(calendar.timegm(d.utctimetuple()))
-
+	if (years is not None):
+		d = datetime.now() - relativedelta(years=years)
+		return int(calendar.timegm(d.utctimetuple()))
+	else:
+		return None
 
 def _kaltura_search_entry(field, op, value):
 	search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem

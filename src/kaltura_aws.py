@@ -126,7 +126,7 @@ check status of entries, that is check each matching entry for the following:
     def _add_filter_params(subparser, max_entries=25):
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--category", "-c",  help="kaltura category")
-        subparser.add_argument("--plays",  help="number of video plays")
+        subparser.add_argument("--plays",  help="number of video plays is smaller than given number")
         subparser.add_argument("--status",   nargs='*', default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, ' '.join(DEFAULT_STATUS_LIST)))
 
         media_types  = kaltura.Filter.MEDIA_TYPES.keys()
@@ -159,7 +159,7 @@ def _create_filter(params):
             filter.tag(params['tag'])
             #filter.category(params['category'])
             filter.status(','.join(params['status']))
-            #filter.plays_equal(params['plays'])
+            filter.plays_lt(params['plays'])
             filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
             filter.created_within_years(params['created_within']).years_since_created(params['created_before'])
             filter.first_page(params['first_page']).page_size(params['page_size'])

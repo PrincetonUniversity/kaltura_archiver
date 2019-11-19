@@ -103,9 +103,15 @@ class TestFilterModes(TestKaltura):
     def test_filter_status(self):
         filter = kaltura.Filter().status("2,7")
         sfilter = str(filter)
-        print(sfilter)
         for e in  filter:
             self.assertTrue(e.getStatus().getValue() in ["2", "7"])
+
+    def test_filter_plays_lower_than(self):
+        n = 11
+        filter = kaltura.Filter().plays_lt(n).page_size(10).max_iter(7)
+        sfilter = str(filter)
+        for e in  filter:
+            self.assertTrue(e.plays < n)
 
 
 if __name__ == '__main__':
