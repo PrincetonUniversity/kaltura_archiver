@@ -108,7 +108,7 @@ class Filter:
 
 
 			if tag.startswith("!"):
-				search_entry = self._kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+				search_entry = _kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
 														  KalturaESearchItemType.PARTIAL,
 														  tag[1:])
 				# must wrap a NOT operator around tag search_entry
@@ -117,7 +117,7 @@ class Filter:
 				not_op.searchItems = [search_entry]
 				search_entry = not_op
 			else:
-				search_entry = self._kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+				search_entry = _kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
 														  KalturaESearchItemType.PARTIAL,
 														  tag)
 			self.search_params.searchOperator.searchItems.append(search_entry)
@@ -184,7 +184,7 @@ class Filter:
 		"""
 		if years is not None:
 			range = KalturaESearchRange()
-			since = Filter._years_ago(years)
+			since = _years_ago(years)
 			if (mode == 'lessThanOrEqual'):
 				range.lessThanOrEqual = since
 			elif (mode == 'greaterThan'):
@@ -197,68 +197,65 @@ class Filter:
 
 		return self
 
-	@staticmethod
-	def _years_ago(years):
-		"""
-		:param years: number of years
-		:return: return   unix standard time of now() - years
-
-		"""
-		d = datetime.now() - relativedelta(years=years)
-		return int(calendar.timegm(d.utctimetuple()))
-
 	def __iter__(self):
 		return FilterIter(self)
 
 	def _search_for_entry(self, field, op, value):
-		search_for = self._kaltura_search_entry(field, op, value)
+		search_for = _kaltura_search_entry(field, op, value)
 		self.search_params.searchOperator.searchItems.append(search_for)
-		api.logger.debug("Filter + %s" %  self._repr_search_entry_item(search_for))
-
-	@staticmethod
-	def _kaltura_search_entry(field, op, value):
-		search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
-		search_for.fieldName = field
-		search_for.itemType = op
-		if op == KalturaESearchItemType.RANGE:
-			search_for.range = value
-		else:
-			search_for.searchTerm = value
-		return search_for
+		api.logger.debug("Filter + %s" %  _repr_search_entry_item(search_for))
 
 	def __str__(self):
-		searcher =  self._repr_search_operator(self.search_params.searchOperator)
+		searcher =  _repr_search_operator(self.search_params.searchOperator)
 		return "Filter({}, [page:{} len:{} max={}])".format(searcher, self.page, self.per_page, self.maximum_iter)
 
 	def __repr__(self):
 		return str(self)
 
 
-	@staticmethod
-	def _repr_search_operator(search_op):
-		op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
-		properties = ""
-		for si in search_op.searchItems:
-			properties += " [%s]" % Filter._repr_search_entry_item(si)
-		return "{}({} )".format(op_str, properties)
-
-	@staticmethod
-	def _repr_search_entry_item( search_for):
-		if isinstance(search_for, KalturaESearchEntryOperator):
-			return Filter._repr_search_operator(search_for)
-		op = ""
-		value = ""
-		if (search_for.itemType != KalturaESearchItemType.RANGE):
-			op = Filter.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
-			value = search_for.searchTerm
-		elif (search_for.range):
-			op_value = vars(search_for.range)
-			for rop in op_value.keys():
-				if op_value[rop] != NotImplemented:
-					op +=  "(%s %s) " % (rop, op_value[rop])
-		return "%s %s %s" % (str(search_for.fieldName), op, str(value))
+def _repr_search_entry_item( search_for):
+	if isinstance(search_for, KalturaESearchEntryOperator):
+		return _repr_search_operator(search_for)
+	op = ""
+	value = ""
+	if (search_for.itemType != KalturaESearchItemType.RANGE):
+		op = Filter.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
+		value = search_for.searchTerm
+	elif (search_for.range):
+		op_value = vars(search_for.range)
+		for rop in op_value.keys():
+			if op_value[rop] != NotImplemented:
+				op +=  "(%s %s) " % (rop, op_value[rop])
+	return "%s %s %s" % (str(search_for.fieldName), op, str(value))
 
 
+def _repr_search_operator(search_op):
+	op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
+	properties = ""
+	for si in search_op.searchItems:
+		properties += " [%s]" % _repr_search_entry_item(si)
+	return "{}({} )".format(op_str, properties)
+
+
+def _years_ago(years):
+	"""
+	:param years: number of years
+	:return: return   unix standard time of now() - years
+
+	"""
+	d = datetime.now() - relativedelta(years=years)
+	return int(calendar.timegm(d.utctimetuple()))
+
+
+def _kaltura_search_entry(field, op, value):
+	search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
+	search_for.fieldName = field
+	search_for.itemType = op
+	if op == KalturaESearchItemType.RANGE:
+		search_for.range = value
+	else:
+		search_for.searchTerm = value
+	return search_for
 
 
 class FilterIter:
