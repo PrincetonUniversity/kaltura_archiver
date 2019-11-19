@@ -159,7 +159,7 @@ class Filter:
 		this ignores the first_page, page_sizem, and max_iter settings
 		:return: match count
 		"""
-		return iter(self).last_result.totalCount
+		return iter(self).last_results.totalCount
 
 	def _since_range(self, field_name, mode, years):
 		"""
