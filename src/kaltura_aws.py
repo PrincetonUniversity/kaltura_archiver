@@ -156,11 +156,12 @@ def _create_filter(params):
         if 'status' in params:
             # implies all the other params are there too
             # see ArgParser
-            #filter.tag(params['tag'])
+            filter.tag(params['tag'])
             #filter.category(params['category'])
-            #filter.status(','.join(params['status'])).plays_equal(params['plays'])
+            filter.status(','.join(params['status']))
+            #filter.plays_equal(params['plays'])
             filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
-            #filter.created_wthin_years(params['created_within']).years_since_created(params['created_before'])
+            filter.created_within_years(params['created_within']).years_since_created(params['created_before'])
             filter.first_page(params['first_page']).page_size(params['page_size'])
             filter.max_iter(params['max_entries'])
         if (params['func'] == replace_videos):
