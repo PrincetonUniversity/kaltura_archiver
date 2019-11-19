@@ -140,20 +140,17 @@ class Filter:
 		return self
 
 	def years_since_played(self, years):
-		return self._since_played('lastPlayedAtLessThanOrEqual', years)
+		return self._since_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'lessThanOrEqual', years)
 
 	def played_within_years(self, years):
-		return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
+		return self._since_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'greaterThan', years)
 
 	def years_since_created(self, years):
-		if (years != None):
-			self.filter.createdAtLessThanOrEqual = Filter._years_ago(years)
-		return self
+		return self._since_range(KalturaESearchEntryFieldName.CREATED_AT, 'lessThanOrEqual', years)
 
-	def created_wthin_years(self, years):
-		if (years != None):
-			self.filter.createdAtGreaterThanOrEqual = Filter._years_ago(years)
-		return self
+	def created_within_years(self, years):
+		return self._since_range(KalturaESearchEntryFieldName.CREATED_AT, 'greaterThan', years)
+
 
 	def get_count(self):
 		"""
@@ -164,7 +161,7 @@ class Filter:
 		"""
 		return iter(self).last_result.totalCount
 
-	def _since_played(self, mode, years):
+	def _since_range(self, field_name, mode, years):
 		"""
 		match if video was was not last played since /within the last years
 
@@ -177,16 +174,17 @@ class Filter:
 		if years is not None:
 			range = KalturaESearchRange()
 			since = Filter._years_ago(years)
-			if (mode == 'lastPlayedAtLessThanOrEqual'):
+			if (mode == 'lessThanOrEqual'):
 				range.lessThanOrEqual = since
-			elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
-				range.greaterThanOrEqual = since
-			self._search_for_compare(KalturaESearchEntryFieldName.LAST_PLAYED_AT, KalturaESearchItemType.RANGE, range)
+			elif (mode == 'greaterThan'):
+				range.greaterThan = since
+			else:
+				raise RuntimeError("mode {} not in [{}, {}]".format(mode, 'lessThanOrEqual', 'greaterThan'))
+			self._search_for_compare(field_name, KalturaESearchItemType.RANGE, range)
 		else:
-			api.logger.debug("Filter.{:s}: NOOP".format(mode))
+			api.logger.debug("Filter.{}{:s}: NOOP".format(field_name, mode))
 
 		return self
-
 
 	@staticmethod
 	def _years_ago(years):
