@@ -138,6 +138,17 @@ class MediaEntry:
             self.log_action(logging.ERROR, doReplace, "Replace Orig", str(e))
             return False
 
+    def getTags(self):
+        return  self.entry.getTags().split(', ')
+
+    def setTags(self, tag_lst,  doUpdate=False):
+        mediaEntry = KalturaMediaEntry()
+        mediaEntry.tags = ', '.join(tag_lst)
+        self.log_action(logging.INFO, doUpdate, 'Set Tag', mediaEntry.tags)
+        if doUpdate:
+            api.getClient().media.update(self.entry.getId(), mediaEntry)
+        return None
+
     def addTag(self, newtag, doUpdate=False):
         """
         add given tag to entry
