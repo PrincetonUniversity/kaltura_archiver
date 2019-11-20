@@ -142,8 +142,8 @@ class Filter:
 		:return: self
 		"""
 		if (categoryId != None):
-			self.filter.categoryAncestorIdIn = categoryId
-			api.logger.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
+			#TODO adapt to v15
+			pass
 		return self
 
 	def years_since_played(self, years):

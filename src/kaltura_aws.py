@@ -157,7 +157,7 @@ def _create_filter(params):
             # implies all the other params are there too
             # see ArgParser
             filter.tag(params['tag'])
-            #filter.category(params['category'])
+            filter.category(params['category'])
             filter.status(','.join(params['status']))
             filter.plays_lt(params['plays'])
             filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])

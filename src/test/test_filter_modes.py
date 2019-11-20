@@ -113,6 +113,8 @@ class TestFilterModes(TestKaltura):
         for e in  filter:
             self.assertTrue(e.plays < n)
 
+    def test_filter_category(self):
+        self.assert_ (False, "not yet implemented")
 
 if __name__ == '__main__':
     unittest.main()
