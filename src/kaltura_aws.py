@@ -383,15 +383,14 @@ def repair(params):
     depending on tags replace with place_holder video or with video from s3
 
     :param params: hash that contains kaltura connetion information as well as filtering options given to download action
-    :return  TODO number of repaired entries
+    :return  number of entries not repaired due to failureor slow GLACIER restore
     """
     doit = _setup(params, 'repair')
     filter = _create_filter(params)
-    tmp = params['tmp']
     bucket = params['awsBucket']
     tmp = params['tmp']
     place_holder = params['videoPlaceholder']
-    counts = [0,0,0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         checker = CheckAndLog(mentry)
@@ -426,8 +425,8 @@ def repair(params):
                             wait_for_ready(mentry, doit)
 
         counts[rc] += 1
-    #_log_restore_counts(counts)
-    return counts[RESTORE_DONE]
+    _log_restore_counts(counts, filter)
+    return counts[REPLACE_FAILED] + counts[RESTORE_WAIT_GLACIER]
 
 
 def download(params):
@@ -449,6 +448,9 @@ def download(params):
         return 0
     else:
         return 1
+
+def _restore_counts():
+    return  [0,0,0,0,0]
 
 RESTORE_UNDEFINED = 4
 RESTORE_DONE = 0
@@ -478,7 +480,7 @@ def restore_from_s3(params):
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
-    counts = [0,0,0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = restore_entry_from_s3(mentry, bucket, tmp, doit)
@@ -559,7 +561,7 @@ def replace_videos(params):
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
-    counts = [0, 0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = replace_entry_video(mentry, place_holder, bucket, doit)
@@ -568,10 +570,7 @@ def replace_videos(params):
         counts[rc] += 1
 
     print("REPLACE Filter {}".format(filter))
-    print("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
-    print("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
-    print("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
-    print("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
+    _log_restore_counts(counts, filter)
     return counts[REPLACE_FAILED]
 
 def wait_for_ready(mentry, doit):
@@ -640,13 +639,12 @@ def health_check(params):
     """
     TODO
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
+    :return:  number of unhealthy videos encountered
     """
     _setup(params, None)
     filter = _create_filter(params)
     bucket = params['awsBucket']
 
-    columns = []
     nerror = 0
     columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
                PLACE_HOLDER_VIDEO, SAVED_TO_S3]
