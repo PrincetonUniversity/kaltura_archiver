@@ -51,13 +51,17 @@ class TestKaltura(unittest.TestCase):
             # client.config.logger = KalturaLogger()
             assert(client != None)
 
+    @classmethod
+    def tearDownClass(cls):
+            print("-- tearDownClass {}".format(cls))
+
     def setUp(self):
         self.bucket = TestKaltura.bucket
         self.place_holder_video = TestKaltura.place_holder_video
 
 # enable to see debug logging info during test execution
-_init_loggers()
-kaltura.logger.setLevel('DEBUG')
+#_init_loggers()
+#kaltura.logger.setLevel('DEBUG')
 
 TestKaltura.setUpClass()
 
