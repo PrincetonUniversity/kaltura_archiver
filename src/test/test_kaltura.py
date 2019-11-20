@@ -55,7 +55,10 @@ class TestKaltura(unittest.TestCase):
         self.bucket = TestKaltura.bucket
         self.place_holder_video = TestKaltura.place_holder_video
 
-#_init_loggers()
+# enable to see debug logging info during test execution
+_init_loggers()
+kaltura.logger.setLevel('DEBUG')
+
 TestKaltura.setUpClass()
 
 if __name__ == '__main__':
