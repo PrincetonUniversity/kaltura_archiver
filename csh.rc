@@ -1,3 +1,12 @@
+# number of years to keep videoas in KMC 
+setenv export N_YEARS 3 
+
+# to run in production 
+setenv export DOIT true 
+# to run in test/dryrun mode  
+setenv export DOIT false 
+
+# Kaltura KMC keys
 # Kaltura KMC keys
 setenv    KALTURA_USERID  email
 setenv    KALTURA_PARTNERID  ID

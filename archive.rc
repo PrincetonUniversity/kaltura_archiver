@@ -1,50 +1,70 @@
 #!/bin/bash
 cd `dirname $0`
-# env vars
-#. nogit/bash.rc
-# max_entries  -1 <=> unlimited
 
-tag=unplayed-not-archived
+# this script relieson the following environment variables
+# -) N_YEARS number of years after last played date that we keep videos in KMC
+# -) DOIT - indicates whether to run actions in DRYRUN mode or for 'real'
+#    prod - set to true
+#    test - don't set or set to something other than true
+#
+#  in test mode  s3copy and video replacement is performed in dryrun mode only
+
+if [ -z ${DOIT+x} ]; then DOIT="false"; fi
+if [ $DOIT = "true" ]
+then
+  max_entries=-1
+  do_replace='--replace'
+  do_s3copy='--s3copy'
+else
+  max_entries=1
+  do_replace=''
+  do_s3copy=''
+fi
+
+tag=archive-pending
 log=INFO
 log_dir=$(date +log/%Y/%m/%d)
 mkdir -p $log_dir
 tsv=$(date +$log_dir/$tag-%H:%M:%S)
+tmp=/tmp/archive-$$.tsv
 
 # ----------------------------------------------------------------------------------------
-# backup videos not yet archived that are unplayed within last 3 years
-echo  COUNT videos that are unplayed within last 3 years without archived_to_s3 tag
-cmd="python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --s3copy"
-echo $cmd
-$cmd
+# backup videos not yet archived that are unplayed within last $N_YEARS years
+echo  COUNT videos that are unplayed within last $N_YEARS years without archived_to_s3 tag
+python src/kaltura_aws.py count  --unplayed_for $N_YEARS --tag \!archived_to_s3
 echo ""
-echo  COPY_TO_S3 videos that are unplayed within last 3 years without archived_to_s3 tag
-cmd="python src/kaltura_aws.py s3copy  --unplayed_for 3 --tag \!archived_to_s3  --max_entries -1 --replace"
-echo $cmd
-$cmd
+echo  COPY_TO_S3 videos that are unplayed within last $N_YEARS years without archived_to_s3 tag
+python src/kaltura_aws.py --loglevel $log s3copy --unplayed_for $N_YEARS --tag \!archived_to_s3  --max_entries $max_entries $do_s3copy
 echo ""
+
 #
-# replace backed-up  videos unplayed within last 3 years
-echo REPLACE backed-up  videos unplayed within last 3 years
-cmd="python src/kaltura_aws.py --loglevel $log replace_video --unplayed_for 3 --tag archived_to_s3  --max_entries -1 "
-echo $cmd
-$cmd
+# replace backed-up  videos unplayed within last $N_YEARS years
+echo REPLACE backed-up videos unplayed within last $N_YEARS years
+python src/kaltura_aws.py --loglevel $log replace_video --unplayed_for $N_YEARS --tag archived_to_s3  --max_entries $max_entries $do_replace
 echo ""
 
 # ---------------------------------------------------------
 # print counts of videos that should but have not yet been archived and replaced
 echo  count of videos that should but have not yet been ARCHIVED
-python src/kaltura_aws.py count  --unplayed_for 3 --tag \!archived_to_s3
+python src/kaltura_aws.py count  --unplayed_for $N_YEARS --tag \!archived_to_s3
 echo count of videos that should but have not yet been REPLACED
-python src/kaltura_aws.py count --unplayed_for 3 --tag \!flavors_deleted
+python src/kaltura_aws.py count --unplayed_for $N_YEARS --tag \!flavors_deleted
 echo ""
 
 # ----------------------------------------------------------------------------------------
 # print report of videos that should but have not yet been archived
-echo "#Entries not played in 3 years but not ARCHIVED/REPLACED " > $tsv.tsv
-python src/kaltura_aws.py list  --unplayed_for 3 --tag \!archived_to_s3  --max_entries  -1 >> $tsv.tsv
-python src/kaltura_aws.py list  --unplayed_for 3 --tag \!flavors_deleted  --max_entries  -1 >> $tsv.tsv
+echo "#Entries not played in $N_YEARS years AND not ARCHIVED/REPLACED " > $tsv.tsv
+python src/kaltura_aws.py health  --unplayed_for $N_YEARS --tag \!archived_to_s3  --max_entries  -1 > $tmp
+python src/kaltura_aws.py health  --unplayed_for $N_YEARS --tag \!flavors_deleted  --max_entries  -1 >> $tmp
+fgrep entry_id $tmp | head -1 >> $tsv.tsv
+sort -u $tmp >> $tsv.tsv
 
 
 # ----------------------------------------------------------------------------------------
 # copy report to log in s3
-aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
+if [ $doit ]
+then
+  aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
+else
+  echo "$tsv.tsv"
+fi
