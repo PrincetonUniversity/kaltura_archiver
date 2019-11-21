@@ -165,8 +165,8 @@ def _create_filter(params):
             filter.first_page(params['first_page']).page_size(params['page_size'])
             filter.max_iter(params['max_entries'])
         if (params['func'] == replace_videos):
-            if (not 'created_before' in params or params['created_before'] < YEARS_SINCE_CREATION_FOR_REPLACE):
-                kaltura.logger.info("Adding years_since_ccreate = {} years   to filter".format(YEARS_SINCE_CREATION_FOR_REPLACE))
+            if (not 'created_before' in params ):
+                kaltura.logger.info("Adding years_since_create = {} years   to filter".format(YEARS_SINCE_CREATION_FOR_REPLACE))
                 filter.years_since_created(YEARS_SINCE_CREATION_FOR_REPLACE)
 
     kaltura.logger.info("FILTER {}".format(filter))
