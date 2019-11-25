@@ -23,7 +23,7 @@ class TestKaltura(unittest.TestCase):
     # if test fail follow up tests may start in unexpected scenarios
     TEST_KALTURA_PARTNER_ID = 336061
 
-    TEST_ID_1 = '1_tza6webs'
+    TEST_ID_1 = '1_nkc7nbgs'
 
     # this image should not have an s3 copy when test are started
     TEST_ID_NO_S3_COPY = '1_z9hho4yy'
