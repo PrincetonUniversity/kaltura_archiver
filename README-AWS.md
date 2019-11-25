@@ -44,6 +44,14 @@ docker images test_kaltura
 
 # start container and enter sh 
 docker run --env-file env.list -i -t test_kaltura sh
+
+# run a command; view exit code;  
+docker run --env-file nogit/test-aws test_kaltura ./restore.rc
+docker ps -a | fgrep test_kaltura
+
+# show log using CONTAINER_ID or NAME shown  by docker ps 
+docker logs 4ec78762c65f
+docker logs zen_heisenberg
 ~~~
 
 ## Update in AWS ECR repository
