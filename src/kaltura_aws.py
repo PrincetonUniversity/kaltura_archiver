@@ -66,14 +66,14 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('repair', description="repair matching videos - look at tags and replace original flavor as tags indicate ")
         subparser.add_argument("--repair", action="store_true", default=False, help="performs in dryrun mode, unless repair param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=repair)
 
         subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=copy_to_s3)
 
@@ -81,7 +81,7 @@ It  uses the following environment variables
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before restoring next video")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=restore_from_s3)
 
@@ -89,7 +89,7 @@ It  uses the following environment variables
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before replacing next video")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=replace_videos)
 
@@ -100,12 +100,12 @@ It  uses the following environment variables
         subparser.set_defaults(func=download)
 
         subparser = subparsers.add_parser('count', description="count matching videos ")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser, page_size=0))
         subparser.set_defaults(func=count)
 
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
-        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=list)
 
@@ -116,14 +116,14 @@ check status of entries, that is check each matching entry for the following:
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('health', description=description)
-        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=health_check)
 
         return parser
 
     @staticmethod
-    def _add_filter_params(subparser, max_entries=25):
+    def _add_filter_params(subparser):
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--category", "-c",  help="kaltura category")
         subparser.add_argument("--plays",  help="number of video plays is smaller than given number")
@@ -137,14 +137,16 @@ check status of entries, that is check each matching entry for the following:
         subparser.add_argument("--played_within", "-p",  type=int, help="played within the the given number of years")
         subparser.add_argument("--unplayed_for", "-u",  type=int, help="unplayed for given number of years")
 
-        subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
-        subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
-                               help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
-        subparser.add_argument("--max_entries", "-M",  type=int, default=max_entries, help="maximum number of entries to work on  - default {}, -1 means unlimited".format(max_entries))
-
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
 
-        return None
+        return subparser
+
+    def _add_pager_params(subparser, max_entries=500, page_size=500):
+        subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
+        subparser.add_argument("--page_size", "-s", type=int, default=page_size,
+                               help="number of entries per page - default {}".format(page_size))
+        subparser.add_argument("--max_entries", "-M",  type=int, default=max_entries, help="maximum number of entries to work on  - default {}, -1 means unlimited".format(max_entries))
+        return subparser
 
 def _create_filter(params):
     if ('idfile' in params and params['idfile']):
