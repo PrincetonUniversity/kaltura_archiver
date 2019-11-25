@@ -37,13 +37,13 @@ PLACEHOLDER_VIDEO=placeholder_video.mp4 \
 ### Locally Test Docker Image 
 
 ~~~
-docker build -t test .
+docker build -t test_kaltura .
 
-# list info on test image
-docker images test 
+# list info on test_kaltura image
+docker images test_kaltura 
 
 # start container and enter sh 
-docker run --env-file env.list -i -t test sh
+docker run --env-file env.list -i -t test_kaltura sh
 ~~~
 
 ## Update in AWS ECR repository
