@@ -1,0 +1,6 @@
+#!/bin/bash -e
+echo -n "ECR repository-name> ";   read repo
+
+$(aws ecr get-login --profile monikasu-cisdr-admin --no-include-email --region us-east-1)
+docker pull 168298894881.dkr.ecr.us-east-1.amazonaws.com/$repo":latest"
+docker images | fgrep $repo
