@@ -745,7 +745,9 @@ def _main(argv):
     args = parser.parse_args(argv)
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
     params.update(vars(args))
-    return params['func'](params)
+    rc =  params['func'](params)
+    if (rc != 0):
+        logging.error('{}: return code {}'.format(params['func'].func_name, rc))
 
 def _init_loggers():
     handler = logging.StreamHandler()
@@ -757,8 +759,8 @@ if __name__ == '__main__':
     try:
         _init_loggers()
         logging.root.setLevel(logging.INFO)
-        status = _main(sys.argv[1:])
-        sys.exit(status)
+        _main(sys.argv[1:])
+        sys.exit(0)
     except Exception as e:
         print("\n" + str(e) + "\n")
         parser = KalturaArgParser.create()

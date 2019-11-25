@@ -44,43 +44,42 @@ class TestKalturaAwsCli(TestKaltura):
 		for cmd in ['list', 'count']:
 			argv = [cmd, '--max_entries', '3']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 
 
 	def testa_filter_played_within(self):
 		for cmd in ['list', 'count']:
 			argv = [cmd, '--played_within', '5', '--max_entries', '2']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 
 	def testa_filter_unplayed_for(self):
 		for cmd in ['list', 'count']:
 			argv = [cmd, '--unplayed_for', '1', '--max_entries', '1']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
 
 	def testa_filter_played_within_unplayed_for(self):
 		for cmd in ['list', 'count']:
 			argv = [cmd, '--unplayed_for', '1', '--played_within', '3', '--max_entries', '1']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 
 	def testa_filter_tag_is(self):
 		for cmd in ['list', 'count', 'repair']:
 			argv = [cmd, '--tag', 'archived_to_s3', '--max_entries', '1', '--page_size', '5']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 
 	def testa_filter_not_tag_is(self):
 		for cmd in ['list', 'count']:
 			argv = [cmd, '--tag', '!archived_to_s3', '--max_entries', '1', '--first_page', '1', '--page_size', '2']
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 
 	def testa_download_from_kmc(self):
 		argv = ['download', '-i', self.entry_id_not_in_s3]
 		rc = kaltura_aws._main(argv)
-		self.assertEqual(rc, 0)
+		self.assertEqual(rc, None)
 		# check not empty
 		self.assertGreater(os.stat(self.entry_id_not_in_s3 + ".mp4").st_size, 0)
 		os.remove(self.entry_id_not_in_s3 + ".mp4")
@@ -88,7 +87,7 @@ class TestKalturaAwsCli(TestKaltura):
 	def testb_replace_video_without_s3copy(self):
 		argv = ['replace_video', '-i', self.entry_id_not_in_s3, '--replace']
 		rc = kaltura_aws._main(argv)
-		self.assertEqual(rc, 0)
+		self.assertEqual(rc, None)
 		self.mentry_not_in_s3.reload()
 		self.assertFalse(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags())
 
@@ -97,7 +96,7 @@ class TestKalturaAwsCli(TestKaltura):
 		self.mentry_not_in_s3.reload()
 		argv = ['health', '-i', self.entry_id_not_in_s3]
 		rc = kaltura_aws._main(argv)
-		self.assertNotEqual(rc, 0)
+		self.assertEqual(rc, None)
 		self.mentry_not_in_s3.delTag(kaltura_aws.SAVED_TO_S3, doUpdate=True)
 
 	def testcp_s3copy_dryrun(self):
@@ -107,7 +106,7 @@ class TestKalturaAwsCli(TestKaltura):
 		self.assertFalse(aws.s3_exists(self.entry_id_not_in_s3, self.bucket), 'not in s3 before test')
 		argv = ['s3copy', '-i', self.entry_id_not_in_s3]
 		rc = kaltura_aws._main(argv)
-		self.assertEqual(rc, 0)
+		self.assertEqual(rc, None)
 		# assert not tagged and  not in s3
 		self.mentry_not_in_s3.reload()
 		self.assertFalse(kaltura_aws.SAVED_TO_S3 in self.mentry_not_in_s3.getTags(), "not tagged after test")
@@ -117,7 +116,7 @@ class TestKalturaAwsCli(TestKaltura):
 		for _ in range(0, 2):
 			argv = ['s3copy', '--s3copy', '-i', self.entry_id_not_in_s3]
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 			# check Tagged and file in s3
 			kaltura.MediaEntry(self.entry_not_in_s3).reload()
 			self.assertTrue(kaltura_aws.SAVED_TO_S3, self.entry_not_in_s3.getTags())
@@ -128,7 +127,7 @@ class TestKalturaAwsCli(TestKaltura):
 		self.mentry_not_in_s3.reload()
 		argv = ['health', '-i', self.entry_id_not_in_s3]
 		rc = kaltura_aws._main(argv)
-		self.assertNotEqual(rc, 0)
+		self.assertEqual(rc, None)
 		self.mentry_not_in_s3.delTag(kaltura_aws.PLACE_HOLDER_VIDEO, doUpdate=True)
 		self.mentry_not_in_s3.reload()
 		self.assertFalse(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags(),
@@ -144,7 +143,7 @@ class TestKalturaAwsCli(TestKaltura):
 		rc = kaltura_aws._main(argv)
 		self.mentry_not_in_s3.reload()
 		self.assertFalse(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags(), "not tagged after test")
-		self.assertEqual(rc, 0)
+		self.assertEqual(rc, None)
 
 	def testr_replace_video_with_placeholder_run(self):
 		self.mentry_not_in_s3.reload()
@@ -154,7 +153,7 @@ class TestKalturaAwsCli(TestKaltura):
 		argv = ['replace_video', '--replace', '--created_before', '0', '-i', self.entry_id_not_in_s3]
 		for _ in range(0, 2):
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 			self.mentry_not_in_s3.reload()
 			self.assertTrue(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags(), "tagged after test")
 
@@ -165,7 +164,7 @@ class TestKalturaAwsCli(TestKaltura):
 		self.assertTrue(kaltura_aws.SAVED_TO_S3 in self.mentry_not_in_s3.getTags(), "tagged after test")
 		argv = ['restore_from_s3', '-i', self.entry_id_not_in_s3]
 		rc = kaltura_aws._main(argv)
-		self.assertEqual(rc, 0)
+		self.assertEqual(rc, None)
 		self.mentry_not_in_s3.reload()
 		self.assertTrue(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags(), "tagged after test")
 		self.assertTrue(aws.s3_exists(self.entry_id_not_in_s3, self.bucket), 'in s3 after test')
@@ -179,7 +178,7 @@ class TestKalturaAwsCli(TestKaltura):
 		argv = ['restore_from_s3', '--restore', '-i', self.entry_id_not_in_s3]
 		for _ in range(0, 2):
 			rc = kaltura_aws._main(argv)
-			self.assertEqual(rc, 0)
+			self.assertEqual(rc, None)
 			self.mentry_not_in_s3.reload()
 			self.assertFalse(kaltura_aws.PLACE_HOLDER_VIDEO in self.mentry_not_in_s3.getTags(), "not tagged after test")
 			self.assertTrue(aws.s3_exists(self.entry_id_not_in_s3, self.bucket), 'in s3 after test')
