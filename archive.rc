@@ -1,4 +1,8 @@
-#!/bin/bash
+#!/bin/bash -e
+args="$*"
+function except() { echo "Error: $0 $args" ;  }
+trap except ERR
+
 cd `dirname $0`
 
 # this script relieson the following environment variables

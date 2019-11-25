@@ -1,7 +1,11 @@
-#!/bin/bash 
+#!/bin/bash -e
+args="$*"
+function except() { echo "Error: $0 $args" ;  }
+trap except ERR
+
 cd `dirname $0`
 
-# this script relieson the following environment variables
+# this script relies on the following environment variables
 # -) N_YEARS number of years after last played date that we keep videos in KMC
 # -) DOIT - indicates whether to run actions in DRYRUN mode or for 'real'
 #    prod - set to true
