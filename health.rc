@@ -25,8 +25,13 @@ python src/kaltura_aws.py -l $log  health --played_within $N_YEARS --tag flavors
 echo "# -------------------------------------------------------------------"
 echo "# videos not played in $N_YEARS years  - should be archived and replaced  "
 echo "# -------------------------------------------------------------------"
+<<<<<<< HEAD
 python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!archived_to_s3  >> $tsv
 python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!flavors_deleted  >> $tsv
+=======
+python src/kaltura_aws.py -l $log  health --unplayed_for $N_YEARS  --tag \!archived_to_s3  >> $tsv
+python src/kaltura_aws.py -l $log  health --unplayed_for $N_YEARS  --tag \!flavors_deleted  >> $tsv
+>>>>>>> c3f28b3... rework bash scripts: split off health reporting
 
 echo "# -------------------------------------------------------------------"
 echo "# videos never played in $N_YEARS  - should be archived and replaced  "
