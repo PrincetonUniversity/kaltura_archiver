@@ -1,8 +1,4 @@
 #!/bin/bash -e
-args="$*"
-function except() { echo "Error: $0 $args" ;  }
-trap except ERR
-
 cd `dirname $0`
 
 # this script relieson the following environment variables
@@ -25,50 +21,29 @@ else
   do_s3copy=''
 fi
 
-tag=archive-pending
-log=INFO
-log_dir=$(date +log/%Y/%m/%d)
-mkdir -p $log_dir
-tsv=$(date +$log_dir/$tag-%H:%M:%S)
-tmp=/tmp/archive-$$.tsv
 
-# ----------------------------------------------------------------------------------------
-# backup videos not yet archived that are unplayed within last $N_YEARS years
-echo  COUNT videos that are unplayed within last $N_YEARS years without archived_to_s3 tag
+log=INFO
+
+echo "# ----------------------------------------------------------------------------------------"
+echo "# backup videos not yet archived that are unplayed within last $N_YEARS years"
+echo "# ----------------------------------------------------------------------------------------"
+echo "# COUNT videos that are unplayed within last $N_YEARS years without archived_to_s3 tag"
 python src/kaltura_aws.py count  --unplayed_for $N_YEARS --tag \!archived_to_s3
+python src/kaltura_aws.py count  --created_before  $N_YEARS --tag \!archived_to_s3
 echo ""
-echo  COPY_TO_S3 videos that are unplayed within last $N_YEARS years without archived_to_s3 tag
+echo "# COPY_TO_S3 videos that are unplayed within last $N_YEARS years without archived_to_s3 tag"
 python src/kaltura_aws.py --loglevel $log s3copy --unplayed_for $N_YEARS --tag \!archived_to_s3  --max_entries $max_entries $do_s3copy
 echo ""
 
 #
-# replace backed-up  videos unplayed within last $N_YEARS years
-echo REPLACE backed-up videos unplayed within last $N_YEARS years
+echo "# replace backed-up  videos unplayed within last $N_YEARS years"
 python src/kaltura_aws.py --loglevel $log replace_video --unplayed_for $N_YEARS --tag archived_to_s3  --max_entries $max_entries $do_replace
 echo ""
 
-# ---------------------------------------------------------
-# print counts of videos that should but have not yet been archived and replaced
-echo  count of videos that should but have not yet been ARCHIVED
+echo "# ---------------------------------------------------------"
+echo "# counts of videos that should but have not yet been archived and replaced"
+echo "# ---------------------------------------------------------"
 python src/kaltura_aws.py count  --unplayed_for $N_YEARS --tag \!archived_to_s3
-echo count of videos that should but have not yet been REPLACED
 python src/kaltura_aws.py count --unplayed_for $N_YEARS --tag \!flavors_deleted
 echo ""
 
-# ----------------------------------------------------------------------------------------
-# print report of videos that should but have not yet been archived
-echo "#Entries not played in $N_YEARS years AND not ARCHIVED/REPLACED " > $tsv.tsv
-python src/kaltura_aws.py health  --unplayed_for $N_YEARS --tag \!archived_to_s3  --max_entries  -1 > $tmp
-python src/kaltura_aws.py health  --unplayed_for $N_YEARS --tag \!flavors_deleted  --max_entries  -1 >> $tmp
-fgrep entry_id $tmp | head -1 >> $tsv.tsv
-sort -u $tmp >> $tsv.tsv
-
-
-# ----------------------------------------------------------------------------------------
-# copy report to log in s3
-if [ $doit ]
-then
-  aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv
-else
-  echo "$tsv.tsv"
-fi
