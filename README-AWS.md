@@ -37,17 +37,17 @@ PLACEHOLDER_VIDEO=placeholder_video.mp4 \
 ### Locally Test Docker Image 
 
 ~~~
-docker build -t test_kaltura .
+docker build -t kaltura .
 
-# list info on test_kaltura image
-docker images test_kaltura 
+# list info on kaltura image
+docker images kaltura 
 
 # start container and enter sh 
-docker run --env-file env.list -i -t test_kaltura sh
+docker run --env-file env.list -i -t kaltura sh
 
 # run a command; view exit code;  
-docker run --env-file nogit/test-aws test_kaltura ./restore.rc
-docker ps -a | fgrep test_kaltura
+docker run --env-file nogit/test-aws kaltura ./restore.rc
+docker ps -a | fgrep kaltura
 
 # show log using CONTAINER_ID or NAME shown  by docker ps 
 docker logs 4ec78762c65f
