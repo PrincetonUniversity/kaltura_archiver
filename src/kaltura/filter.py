@@ -9,6 +9,8 @@ import api
 class Filter:
 	MAX_PAGE_SIZE = 500
 	ENTRY_STATUS_READY = KalturaEntryStatus.READY
+	ENTRY_ANY_STATUS = "-2,-1,0,1,2,3,4,5,6,7"
+
 	ORDER_BY = "+createdAt"  # oldest first
 	MEDIA_TYPES = {
 		'video' : KalturaMediaType.VIDEO,

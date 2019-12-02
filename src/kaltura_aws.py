@@ -247,7 +247,12 @@ class IdFileIter:
         :param file: input file descriptor
         """
         self.file = file
-        self.filter = kaltura.Filter()
+
+    def __str__(self):
+        return "IdFilter(file={})".format(self.file.name)
+
+    def __repr__(self):
+        return str(self)
 
     def __iter__(self):
         return self;
@@ -264,9 +269,9 @@ class IdFileIter:
             return self.next()
 
         # get info from kaltura
-        self.filter.entry_id(id)
         try:
-            result = next(iter(self.filter))
+            f = kaltura.Filter().entry_id(id).status(kaltura.Filter.ENTRY_ANY_STATUS)
+            result = next(iter(f))
             return result
         except StopIteration:
             kaltura.logger.warning(("No match for id '{}'".format(id)))
