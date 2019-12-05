@@ -1,27 +1,35 @@
-#!/bin/bash 
+#!/bin/bash -e
 cd `dirname $0`
-# env vars  
-#. nogit/bash.rc 
-max=25
 
-tag=restore-pending
-log=INFO
-log_dir=$(date +log/%Y/%m/%d)
-mkdir -p $log_dir
-tsv=$(date +$log_dir/$tag-%H:%M:%S)
-# ----------------------------------------------------------------------------------------
-# restore videos played or created within last 3 years -
-# the latter should not ever be the case but we might as well cleanup if errors occur
+# this script relies on the following environment variables
+# -) N_YEARS number of years after last played date that we keep videos in KMC
+# -) DOIT - indicates whether to run actions in DRYRUN mode or for 'real'
+#    prod - set to true
+#    test - don't set or set to something other than true
 #
-echo "restore deleted videos PLAYED within 3 YEARS"
-cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3 --tag flavors_deleted --played_within 3 --max_entries $max --restore"
-echo $cmd 
-$cmd 
+# in test mode restore is donw only in DRYRUN mode
 
-echo "restore deleted videos CREATED within 3 YEARS"
-cmd="python src/kaltura_aws.py --loglevel $log restore_from_s3  --tag flavors_deleted --created_within 3 --max_entries $max --restore"
-echo $cmd 
-$cmd 
+if [ -z ${DOIT+x} ]; then DOIT="false"; fi
+if [ $DOIT = "true" ]
+then
+  max_entries=-1
+  doit_restore='--restore'
+else
+  max_entries=1
+  doit_restore=''
+fi
+
+log=INFO
+
+echo "# -----------------------------------------------------------------------------"
+echo "# restore videos played or created within last 3 years "
+echo "# the latter should not be the case but we might as well cleanup if errors occur"
+echo "# -----------------------------------------------------------------------------"
+echo "# restore deleted videos PLAYED within $N_YEARS YEARS"
+python src/kaltura_aws.py --loglevel $log restore_from_s3 --tag flavors_deleted --played_within $N_YEARS --max_entries $max_entries $doit_restore
+
+echo "# restore deleted videos CREATED within $N_YEARS YEARS"
+python src/kaltura_aws.py --loglevel $log restore_from_s3  --tag flavors_deleted --created_within $N_YEARS --max_entries $max_entries $doit_restore
 echo ""
 
 # ---------------------------------------------------------
@@ -29,22 +37,12 @@ echo ""
 #
 # should print a count near zero  - we may be waiting for videos to come out of glacier
 # should print a count of 0
-echo "#videos DELETED and PLAYED within 3 years"
-python src/kaltura_aws.py count --tag flavors_deleted --played_within 3
-echo "#videos DELETED and CREATED within 3 years"
-python src/kaltura_aws.py  count --tag flavors_deleted --created_within 3
+echo "#-----------------------------------"
+echo "# videos still needed to be restored"
+echo "#-----------------------------------"
+echo "#videos DELETED/REPLACED and PLAYED  within $N_YEARS years"
+python src/kaltura_aws.py count --tag flavors_deleted --played_within $N_YEARS
+echo "#videos DELETED/REPLACED and CREATED within $N_YEARS years"
+python src/kaltura_aws.py  count --tag flavors_deleted --created_within $N_YEARS
 echo ""
 
-
-# ----------------------------------------------------------------------------------------
-# generate  health  report of entries that still need to be restored
-python src/kaltura_aws.py  health --tag flavors_deleted --played_within 3 > $tsv
-python src/kaltura_aws.py  health --tag flavors_deleted --created_within 3 >> $tsv
-# combine and clean up 
-echo "#Entries created or played within last 3 years that have a flavors-deleted tag" >> $tsv.tsv
-fgrep entry_id  $tsv | head -n 1 >> $tsv.tsv
-sort -u $tsv >> $tsv.tsv
-
-# ----------------------------------------------------------------------------------------
-# copy report to s3
-aws s3 cp $tsv.tsv  s3://$AWS_BUCKET/$tsv.tsv

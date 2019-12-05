@@ -1,0 +1,39 @@
+#!/bin/bash -e
+cd `dirname $0`
+
+log=INFO
+
+# this script relies on the following environment variables
+# -) N_YEARS number of years after last played date that we keep videos in KMC
+# ----------------------------------------------------------------------------------------
+# generate  health  report of entries that still need to be archived/restored/replaced 
+
+tsv=/tmp/$$.tsv
+
+echo "# PRINT HEALTH REPORT of videos that violate expectations about their status, "
+echo "# that is avout the relationship between the date they were last played and whether  "
+echo "#  - they should be archived to s3  "
+echo "#  - they should be replaced with the place holder videa an "
+echo "#  - their original video should be restored from s3  "
+echo ""
+
+echo "# -------------------------------------------------------------------"
+echo "# replaced videos played in the last $N_YEARS years  - should be restored "
+echo "# -------------------------------------------------------------------"
+python src/kaltura_aws.py -l $log  health --played_within $N_YEARS --tag flavors_deleted >> $tsv
+
+echo "# -------------------------------------------------------------------"
+echo "# videos not played in $N_YEARS years  - should be archived and replaced  "
+echo "# -------------------------------------------------------------------"
+python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!archived_to_s3  >> $tsv
+python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!flavors_deleted  >> $tsv
+
+echo "# -------------------------------------------------------------------"
+echo "# videos never played in $N_YEARS  - should be archived and replaced  "
+echo "# -------------------------------------------------------------------"
+python src/kaltura_aws.py -l $log  health --plays 1 --created_before $N_YEARS  --tag \!archived_to_s3  >> $tsv
+python src/kaltura_aws.py -l $log  health --plays 1 --created_before $N_YEARS  --tag \!flavors_deleted  >> $tsv
+
+fgrep entry_id $tsv | head -1 
+sort -u $tsv 
+

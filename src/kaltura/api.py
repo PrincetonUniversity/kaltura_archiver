@@ -1,5 +1,6 @@
 from KalturaClient import *
 from KalturaClient.Plugins.Core import *
+from KalturaClient.Base import IKalturaLogger
 
 from datetime import datetime
 

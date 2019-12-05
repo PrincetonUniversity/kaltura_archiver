@@ -212,10 +212,16 @@ stats.py
 
 ## Execute Tests 
 
-set environment variabes so code connects to TEST KMC, then run: 
+set environment variabes so code connects to TEST KMC, then run in project's top directory  
 
 ~~~
-python -m unittest discover -v test
+setenv PYTHONPATH src
+python -m unittest discover -v src/test
+~~~
+
+to run individual tests do something along these lines: 
+~~~
+python src/test/test_kaltura_aws.py TestKalturaAwsCli.testa_list_played_within_unplayed_for
 ~~~
 
 
@@ -267,3 +273,14 @@ V1.0.0   kaltura archiver executing in docker
 V1.1.0   kaltura archiver and restorer in same docker image 
 
 V1.1.1   INFO logging in restore.rc, ERROR logging in archive.rc, pip install -r src/requirements.txt
+
+V1.2.0   
+- Use Kaltura Api v15.10.0
+- Filter on play lower than instead of equal number 
+- Stubs only for category filter 
+- kaltura_aws.py - exits with no-zero only if incorrect usage
+- bash scripts archive.rc/restore.rc exit on first failed command 
+- bash scripts archive.rc/restore.rc rely on envirnmane variables: N_YEARS, DOIT
+- implemented additional test cases 
+- moved docker_pull to bin/ directory 
+- added convenience scripts bin/docker_pull, bin/start_kaltura_session.sh

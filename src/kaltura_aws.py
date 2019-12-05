@@ -21,7 +21,6 @@ YEARS_SINCE_CREATION_FOR_REPLACE = 3
 DEFAULT_STATUS_LIST = "-1,-2,0,1,2,7,4".split(",")
 #see site-packages/KalturaClient/Plugins/Core.py  - class KalturaEntryStatus(object):
 
-
 # if waiting for uploaded video's original flavor to reach READY status   - sleep for POLL_READY_WAIT sec in between checks
 POLL_READY_WAIT = 10
 
@@ -67,14 +66,14 @@ It  uses the following environment variables
         subparser = subparsers.add_parser('repair', description="repair matching videos - look at tags and replace original flavor as tags indicate ")
         subparser.add_argument("--repair", action="store_true", default=False, help="performs in dryrun mode, unless repair param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=repair)
 
         subparser = subparsers.add_parser('s3copy', description="copy original flavors of matching videos to AWS-s3; skip flavors bigger than {} kb".format(CheckAndLog.SIZE_LIMIT_KB))
         subparser.add_argument("--s3copy", action="store_true", default=False, help="performs in dryrun mode, unless save param is given")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=copy_to_s3)
 
@@ -82,7 +81,7 @@ It  uses the following environment variables
         subparser.add_argument("--restore", action="store_true", default=False, help="performs in dryrun mode, unless restore param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before restoring next video")
         subparser.add_argument("--tmp", default=".", help="directory for temporary files")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=restore_from_s3)
 
@@ -90,7 +89,7 @@ It  uses the following environment variables
         IF entries have healthy archived copy in AWS-s3")
         subparser.add_argument("--replace", action="store_true", default=False, help="performs in dryrun mode, unless replace param is given")
         subparser.add_argument("--wait_ready", '-w', action="store_true", default=True, help="wait for original flavor status to be ready before replacing next video")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=replace_videos)
 
@@ -101,12 +100,12 @@ It  uses the following environment variables
         subparser.set_defaults(func=download)
 
         subparser = subparsers.add_parser('count', description="count matching videos ")
-        KalturaArgParser._add_filter_params(subparser)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser, page_size=0))
         subparser.set_defaults(func=count)
 
         subparser = subparsers.add_parser('list', description="list matching videos ")
         subparser.add_argument("--mode", "-m", choices=["video", "flavor"], default="video", help="list video or flavor information")
-        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=list)
 
@@ -117,32 +116,37 @@ check status of entries, that is check each matching entry for the following:
   +  if it does not have an {} tag the S# entry's size should match the size of the original flavor  
 """.format(SAVED_TO_S3, PLACE_HOLDER_VIDEO)
         subparser = subparsers.add_parser('health', description=description)
-        KalturaArgParser._add_filter_params(subparser, max_entries=-1)
+        KalturaArgParser._add_filter_params(KalturaArgParser._add_pager_params(subparser))
         subparser.add_argument('--idfile', '-I',  type=FileType('r'), required=False, help="file with kaltura ids, one per line")
         subparser.set_defaults(func=health_check)
 
         return parser
 
     @staticmethod
-    def _add_filter_params(subparser, max_entries=25):
+    def _add_filter_params(subparser):
         subparser.add_argument("--tag", "-t",  help="kaltura tag")
         subparser.add_argument("--category", "-c",  help="kaltura category")
-        subparser.add_argument("--plays",  help="number of video plays")
+        subparser.add_argument("--plays",  help="number of video plays is smaller than given number")
         subparser.add_argument("--status",   nargs='*', default=DEFAULT_STATUS_LIST, help="list of video status  ({} == READY), default = {}".format(kaltura.Filter.ENTRY_STATUS_READY, ' '.join(DEFAULT_STATUS_LIST)))
+
+        media_types  = kaltura.Filter.MEDIA_TYPES.keys()
+        subparser.add_argument("--media_type, 'm'",  default=media_types[0], choices = media_types, help="media type, default = {}".format(media_types[0]))
 
         subparser.add_argument("--created_within",  type=int, help="creation date lies within the given number years");
         subparser.add_argument("--created_before",   type=int, help="creation date longer than the given number of years ago");
         subparser.add_argument("--played_within", "-p",  type=int, help="played within the the given number of years")
         subparser.add_argument("--unplayed_for", "-u",  type=int, help="unplayed for given number of years")
 
-        subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
-        subparser.add_argument("--page_size", "-s", type=int, default=kaltura.Filter.MAX_PAGE_SIZE,
-                               help="number of entries per page - default {}".format(kaltura.Filter.MAX_PAGE_SIZE))
-        subparser.add_argument("--max_entries", "-M",  type=int, default=max_entries, help="maximum number of entries to work on  - default {}, -1 means unlimited".format(max_entries))
-
         subparser.add_argument("--id", "-i",  help="kaltura media entry id")
 
-        return None
+        return subparser
+
+    def _add_pager_params(subparser, max_entries=500, page_size=500):
+        subparser.add_argument("--first_page", "-f",  type=int, default=1, help="page number where to start iteration - default 1")
+        subparser.add_argument("--page_size", "-s", type=int, default=page_size,
+                               help="number of entries per page - default {}".format(page_size))
+        subparser.add_argument("--max_entries", "-M",  type=int, default=max_entries, help="maximum number of entries to work on  - default {}, -1 means unlimited".format(max_entries))
+        return subparser
 
 def _create_filter(params):
     if ('idfile' in params and params['idfile']):
@@ -156,14 +160,15 @@ def _create_filter(params):
             # see ArgParser
             filter.tag(params['tag'])
             filter.category(params['category'])
-            filter.status(','.join(params['status'])).plays_equal(params['plays'])
+            filter.status(','.join(params['status']))
+            filter.plays_lt(params['plays'])
             filter.years_since_played(params['unplayed_for']).played_within_years(params['played_within'])
-            filter.created_wthin_years(params['created_within']).years_since_created(params['created_before'])
+            filter.created_within_years(params['created_within']).years_since_created(params['created_before'])
             filter.first_page(params['first_page']).page_size(params['page_size'])
             filter.max_iter(params['max_entries'])
         if (params['func'] == replace_videos):
-            if (not 'created_before' in params or params['created_before'] < YEARS_SINCE_CREATION_FOR_REPLACE):
-                kaltura.logger.info("Adding years_since_ccreate = {} years   to filter".format(YEARS_SINCE_CREATION_FOR_REPLACE))
+            if (not 'created_before' in params ):
+                kaltura.logger.info("Adding years_since_create = {} years   to filter".format(YEARS_SINCE_CREATION_FOR_REPLACE))
                 filter.years_since_created(YEARS_SINCE_CREATION_FOR_REPLACE)
 
     kaltura.logger.info("FILTER {}".format(filter))
@@ -380,15 +385,14 @@ def repair(params):
     depending on tags replace with place_holder video or with video from s3
 
     :param params: hash that contains kaltura connetion information as well as filtering options given to download action
-    :return  TODO number of repaired entries
+    :return  number of entries not repaired due to failureor slow GLACIER restore
     """
     doit = _setup(params, 'repair')
     filter = _create_filter(params)
-    tmp = params['tmp']
     bucket = params['awsBucket']
     tmp = params['tmp']
     place_holder = params['videoPlaceholder']
-    counts = [0,0,0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         checker = CheckAndLog(mentry)
@@ -423,8 +427,8 @@ def repair(params):
                             wait_for_ready(mentry, doit)
 
         counts[rc] += 1
-    #_log_restore_counts(counts)
-    return counts[RESTORE_DONE]
+    _log_restore_counts(counts, filter)
+    return counts[REPLACE_FAILED] + counts[RESTORE_WAIT_GLACIER]
 
 
 def download(params):
@@ -446,6 +450,9 @@ def download(params):
         return 0
     else:
         return 1
+
+def _restore_counts():
+    return  [0,0,0,0,0]
 
 RESTORE_UNDEFINED = 4
 RESTORE_DONE = 0
@@ -475,7 +482,7 @@ def restore_from_s3(params):
     filter = _create_filter(params)
     bucket = params['awsBucket']
     tmp = params['tmp']
-    counts = [0,0,0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = restore_entry_from_s3(mentry, bucket, tmp, doit)
@@ -556,7 +563,7 @@ def replace_videos(params):
     bucket = params['awsBucket']
     place_holder = params['videoPlaceholder']
 
-    counts = [0, 0, 0, 0]
+    counts = _restore_counts()
     for entry in filter:
         mentry = kaltura.MediaEntry(entry)
         rc = replace_entry_video(mentry, place_holder, bucket, doit)
@@ -565,10 +572,7 @@ def replace_videos(params):
         counts[rc] += 1
 
     print("REPLACE Filter {}".format(filter))
-    print("# {}: {}".format('REPLACE_FAILED', counts[REPLACE_FAILED]) )
-    print("# {}: {}".format('REPLACE_DONE', counts[REPLACE_DONE]) )
-    print("# {}: {}".format('REPLACE_DONE_BEFORE', counts[REPLACE_DONE_BEFORE]) )
-    print("# {}: {}".format('REPLACE_BIG_FILE_SKIP', counts[REPLACE_BIG_FILE_SKIP]) )
+    _log_restore_counts(counts, filter)
     return counts[REPLACE_FAILED]
 
 def wait_for_ready(mentry, doit):
@@ -637,16 +641,14 @@ def health_check(params):
     """
     TODO
     :param params: hash that contains kaltura connetion information as well as filtering options given for the list action
-    :return:  None
+    :return:  number of unhealthy videos encountered
     """
     _setup(params, None)
     filter = _create_filter(params)
     bucket = params['awsBucket']
 
-    columns = []
     nerror = 0
-    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS,
-               PLACE_HOLDER_VIDEO, SAVED_TO_S3]
+    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.CREATED_AT_DATE]
     print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, 'size_match', '---'])
     for entry in filter:
         mentry = kaltura.MediaEntry(entry);
@@ -743,7 +745,9 @@ def _main(argv):
     args = parser.parse_args(argv)
     params = envvars.to_value(KalturaArgParser.ENV_VARS)
     params.update(vars(args))
-    return params['func'](params)
+    rc =  params['func'](params)
+    if (rc != 0):
+        logging.error('{}: return code {}'.format(params['func'].func_name, rc))
 
 def _init_loggers():
     handler = logging.StreamHandler()
@@ -755,8 +759,8 @@ if __name__ == '__main__':
     try:
         _init_loggers()
         logging.root.setLevel(logging.INFO)
-        status = _main(sys.argv[1:])
-        sys.exit(status)
+        _main(sys.argv[1:])
+        sys.exit(0)
     except Exception as e:
         print("\n" + str(e) + "\n")
         parser = KalturaArgParser.create()

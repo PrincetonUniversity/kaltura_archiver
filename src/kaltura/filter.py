@@ -2,232 +2,292 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 import calendar
 
-from KalturaClient.Plugins.Core import *
-
-try:
-    import api
-except Exception as e:
-    from . import api
-
+from KalturaClient.Plugins.ElasticSearch import *
 import api
 
+
 class Filter:
-    MAX_PAGE_SIZE = 500
-    ENTRY_STATUS_READY = KalturaEntryStatus.READY
-    ORDER_BY = "+createdAt"   # oldest first
+	MAX_PAGE_SIZE = 500
+	ENTRY_STATUS_READY = KalturaEntryStatus.READY
+	ORDER_BY = "+createdAt"  # oldest first
+	MEDIA_TYPES = {
+		'video' : KalturaMediaType.VIDEO,
+		'image' : KalturaMediaType.IMAGE,
+		'audio' : KalturaMediaType.AUDIO
+	}
 
-    def __init__(self, mediaType=KalturaMediaType.VIDEO):
-        self.filter = KalturaMediaEntryFilter()
-        self.filter.mediaTypeEqual = mediaType
-        self.filter.orderBy =  Filter.ORDER_BY
-        self.page  = 1
-        self.per_page  = Filter.MAX_PAGE_SIZE
-        self.maximum_iter  = -1
+	KalturaESearchItem_OPERATOR_STR = {
+		KalturaESearchItemType.EXACT_MATCH : "==",
+		KalturaESearchItemType.STARTS_WITH : "starts-with",
+		KalturaESearchItemType.EXISTS : "exists",
+		KalturaESearchItemType.PARTIAL : "~~",
+		KalturaESearchItemType.RANGE : ""
+	}
 
-    def first_page(self, page):
-        self.page = page
-        return self
+	KalturaESearch_OPERATOR_STR = {
+		KalturaESearchOperatorType.NOT_OP : "NOT",
+		KalturaESearchOperatorType.AND_OP : "AND",
+		KalturaESearchOperatorType.OR_OP : "OR"
+	}
 
-    def page_size(self, size):
-        if (size > Filter.MAX_PAGE_SIZE):
-            api.logger.error("Filter.page_size: {} exceeds MAX page size of {}".format(size, Filter.MAX_PAGE_SIZE))
-            size = Filter.MAX_PAGE_SIZE
-        self.per_page = size
-        return self
+	def __init__(self, mediaType='video'):
+		self.search_params = KalturaESearchEntryParams()
+		self.search_params.aggregations = KalturaESearchAggregation()
+		self.search_params.searchOperator = KalturaESearchEntryOperator()
+		self.search_params.searchOperator.operator = KalturaESearchOperatorType.AND_OP
+		self.search_params.searchOperator.searchItems = []
+		self._search_for_entry(KalturaESearchEntryFieldName.MEDIA_TYPE,
+							   KalturaESearchItemType.EXACT_MATCH,
+							   self.MEDIA_TYPES[mediaType])
 
-    def max_iter(self, iter):
-        self.maximum_iter = iter
-        return self
+		self.tag_esearch_entry = None
+		#TODO self.filter.orderBy = Filter.ORDER_BY
+		self.page  = 1
+		self.per_page  = Filter.MAX_PAGE_SIZE
+		self.maximum_iter = -1  # no limit
 
-    def entry_id(self, entryid):
-        """
-        filter on entryid being equal
+	def first_page(self, page):
+		self.page = page
+		return self
 
-        NOOP if entryid == None
+	def page_size(self, size):
+		if (size > Filter.MAX_PAGE_SIZE):
+			api.logger.error("Filter.page_size: {} exceeds MAX page size of {}".format(size, Filter.MAX_PAGE_SIZE))
+			size = Filter.MAX_PAGE_SIZE
+		self.per_page = size
+		return self
 
-        :param entryid: kaltura media entry id
-        :return: self
-        """
-        if entryid is not None:
-            self.filter.idEqual = entryid
-            api.logger.debug("Filter.id=%s" % self.filter.idEqual)
-        else:
-            api.logger.debug("Filter.entryId: NOOP ")
-        return self
+	def max_iter(self, iter):
+		self.maximum_iter = iter
+		return self
 
-    def status(self, status):
-        """
-        filter on KalturaEntryStatus constant
-        :param status:
-        :return:
-        """
-        if self.filter.statusIn == NotImplemented:
-            self.filter.statusIn = str(status)
-        else:
-            self.filter.statusIn += ",{}".format(status)
-        return self
+	def entry_id(self, entryid):
+		"""
+		filter on entryid being equal
 
-    def tag(self, tag):
-        """
-        if tag does not start with '!' match if it (partially) matches kaltura media entry tag
+		NOOP if entryid == None
 
-        otherwise reverse matching result
+		:param entryid: kaltura media entry id
+		:return: self
+		"""
+		if entryid is not None:
+			self._search_for_entry(KalturaESearchEntryFieldName.ID,
+								   KalturaESearchItemType.EXACT_MATCH, entryid)
+		else:
+			api.logger.debug("Filter.entryId: NOOP ")
+		return self
+    
+	def status(self, status):
+		"""
+		filter on KalturaEntryStatus constant
+		:param status:
+		:return:
+		"""
+		if self.search_params.objectStatuses == NotImplemented:
+			self.search_params.objectStatuses = str(status)
+		else:
+			self.search_params.objectStatuses += ",{}".format(status)
+		return self
 
-        NOOP if tag == None
+	def tag(self, tag):
+		"""
+		if tag does not start with '!' match if it (partially) matches kaltura media entry tag
 
-        not compatible wih undefined_LAST_PLAYED_AT method
+		otherwise reverse matching result
 
-        :param tag: kaltura media entry tag
-        :return: self
-        """
-        if (tag != None):
-            if (self.filter.advancedSearch != NotImplemented):
-                raise RuntimeError("tag: filter.advancedSearch already defined")
-            tagfilter = KalturaMediaEntryMatchAttributeCondition()
-            # if tag start with '|' look for non matching entries
-            if tag.startswith("!"):
-                tagfilter.not_ = True
-                tagfilter.value = tag[1:]
-            else:
-                tagfilter.not_ = False
-                tagfilter.value = tag
-            tagfilter.attribute = KalturaMediaEntryMatchAttribute.TAGS
-            self.filter.advancedSearch = tagfilter
-            api.logger.debug('Filter.tag={}{}'.format("!" if tagfilter.not_ else "", tagfilter.value))
-        return self
+		NOOP if tag == None
 
-    def plays_equal(self, plays):
-        if (plays != None):
-            if (self.filter.advancedSearch != NotImplemented):
-                raise RuntimeError("playsEqual: filter.advancedSearch already defined")
-            self.filter.advancedSearch = KalturaMediaEntryCompareAttributeCondition()
-            self.filter.advancedSearch.attribute = KalturaMediaEntryCompareAttribute.PLAYS
-            self.filter.advancedSearch.comparison = KalturaSearchConditionComparison.EQUAL
-            self.filter.advancedSearch.value = plays
-            api.logger.debug("Filter.playsEqual== {}".format(plays))
-        return self
+		not compatible wih undefined_LAST_PLAYED_AT method
 
-    def category(self, categoryId):
-        """
-        match if given categoryId is in a media entrys' category id list
-
-        NOOP if categoryId == None
-
-        :param categoryId: kaltura media entry category id
-        :return: self
-        """
-        if (categoryId != None):
-            self.filter.categoryAncestorIdIn = categoryId
-            api.logger.debug("Filter.category={}".format(self.filter.categoryAncestorIdIn))
-        return self
-
-    def years_since_played(self, years):
-        return self._since_played('lastPlayedAtLessThanOrEqual', years)
-
-    def played_within_years(self, years):
-        return self._since_played('lastPlayedAtGreaterThanOrEqual', years)
-
-    def years_since_created(self, years):
-        if (years != None):
-            self.filter.createdAtLessThanOrEqual = Filter._years_ago(years)
-        return self
-
-    def created_wthin_years(self, years):
-        if (years != None):
-            self.filter.createdAtGreaterThanOrEqual = Filter._years_ago(years)
-        return self
-
-    def get_count(self):
-        """
-        return number of records macthing the tag, category, and lastPlayed data
-
-        this ignores the first_page, page_sizem, and max_iter settings
-        :return: match count
-        """
-        return iter(self).last_result.totalCount
-
-    def _since_played(self, mode, years):
-        """
-        match if video was was not last played since /within the last years
-
-        NOOP if years == None
-
-        :param mode:  lastPlayedAtLessThanOrEqual or lastPlayedAtGreaterThanOrEqual
-        :param years: number of years
-        :return: self
-        """
-        if years is not None:
-            since = Filter._years_ago(years)
-            if (mode == 'lastPlayedAtLessThanOrEqual'):
-                self.filter.lastPlayedAtLessThanOrEqual = since
-            elif (mode == 'lastPlayedAtGreaterThanOrEqual'):
-                self.filter.lastPlayedAtGreaterThanOrEqual = since
-            api.logger.debug("Filter.{:s} {:s}".format(mode, api.dateString(since)) )
-        else:
-            api.logger.debug("Filter.{:s}: NOOP".format(mode))
-        return self
+		:param tag: kaltura media entry tag
+		:return: self
+		"""
+		if (tag != None):
+			if (self.tag_esearch_entry):
+				raise RuntimeError("tag: already defined")
 
 
-    @staticmethod
-    def _years_ago(years):
-        """
-        :param years: number of years
-        :return: return   unix standard time of now() - years
+			if tag.startswith("!"):
+				search_entry = _kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+														  KalturaESearchItemType.PARTIAL,
+														  tag[1:])
+				# must wrap a NOT operator around tag search_entry
+				not_op = KalturaESearchEntryOperator()
+				not_op.operator = KalturaESearchOperatorType.NOT_OP
+				not_op.searchItems = [search_entry]
+				search_entry = not_op
+			else:
+				search_entry = _kaltura_search_entry(KalturaESearchEntryFieldName.TAGS,
+														  KalturaESearchItemType.PARTIAL,
+														  tag)
+			self.search_params.searchOperator.searchItems.append(search_entry)
+			api.logger.debug('Filter.tag={}'.format(tag))
 
-        """
-        d = datetime.now() - relativedelta(years=years)
-        return int(calendar.timegm(d.utctimetuple()))
+		return self
 
-    def __iter__(self):
-        return FilterIter(self)
+	def plays_lt(self, plays):
+		if (plays != None):
+			self._compare_range(KalturaESearchEntryFieldName.PLAYS,
+								"lessThan",
+								plays)
+		return self
 
-    def __str__(self):
-        vs = vars(self.filter)
-        properties = ["{}={}".format(k, vs[k]) for k in vs.keys() if k not in ['advancedSearch', 'orderBy', 'mediaTypeEqual'] and vs[k] != NotImplemented]
-        if (self.filter.advancedSearch != NotImplemented):
-            avs = vars(self.filter.advancedSearch)
-            properties.append(["{}={}".format(k, avs[k]) for k in avs.keys() if avs[k] != NotImplemented])
-        return "Filter({}, [page:{} len:{} max={}])".format(properties, self.page, self.per_page, self.maximum_iter)
+	def category(self, categoryId):
+		"""
+		match if given categoryId is in a media entrys' category id list
 
-    def __repr__(self):
-        return str(self)
+		NOOP if categoryId == None
+
+		:param categoryId: kaltura media entry category id
+		:return: self
+		"""
+		if (categoryId != None):
+			#TODO adapt to v15
+			pass
+		return self
+
+	def years_since_played(self, years):
+		return self._compare_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'lessThanOrEqual', _years_ago(years))
+
+	def played_within_years(self, years):
+		return self._compare_range(KalturaESearchEntryFieldName.LAST_PLAYED_AT, 'greaterThan', _years_ago(years))
+
+	def years_since_created(self, years):
+		return self._compare_range(KalturaESearchEntryFieldName.CREATED_AT, 'lessThanOrEqual', _years_ago(years))
+
+	def created_within_years(self, years):
+		return self._compare_range(KalturaESearchEntryFieldName.CREATED_AT, 'greaterThan', _years_ago(years))
+
+
+	def get_count(self):
+		"""
+		return number of records macthing the tag, category, and lastPlayed data
+
+		this ignores the first_page, page_sizem, and max_iter settings
+		:return: match count
+		"""
+		return iter(self).last_results.totalCount
+
+	def _compare_range(self, field_name, mode, since):
+		"""
+		match if video was was not last played since /within the last years
+
+		NOOP if years == None
+
+		:param mode:  lastPlayedAtLessThanOrEqual or lastPlayedAtGreaterThanOrEqual
+		:param years: number of years
+		:return: self
+		"""
+		if since is not None:
+			range = KalturaESearchRange()
+			if (mode == 'lessThanOrEqual'):
+				range.lessThanOrEqual = since
+			elif (mode == 'lessThan'):
+				range.lessThan = since
+			elif (mode == 'greaterThan'):
+				range.greaterThan = since
+			else:
+				raise RuntimeError("mode {} not in [{}, {}]".format(mode, 'lessThanOrEqual', 'greaterThan'))
+			self._search_for_entry(field_name, KalturaESearchItemType.RANGE, range)
+		else:
+			api.logger.debug("Filter.{}{:s}: NOOP".format(field_name, mode))
+
+		return self
+
+	def __iter__(self):
+		return FilterIter(self)
+
+	def _search_for_entry(self, field, op, value):
+		search_for = _kaltura_search_entry(field, op, value)
+		self.search_params.searchOperator.searchItems.append(search_for)
+		api.logger.debug("Filter + %s" %  _repr_search_entry_item(search_for))
+
+	def __str__(self):
+		searcher =  _repr_search_operator(self.search_params.searchOperator)
+		return "Filter({}, status:{}, [page:{} len:{} max={}])".format(searcher, self.search_params.objectStatuses, self.page, self.per_page, self.maximum_iter)
+
+	def __repr__(self):
+		return str(self)
+
+
+def _repr_search_operator(search_op):
+	op_str = Filter.KalturaESearch_OPERATOR_STR[search_op.operator]
+	properties = ""
+	for si in search_op.searchItems:
+		properties += " [%s]" % _repr_search_entry_item(si)
+	return "{}({} )".format(op_str, properties)
+
+
+def _repr_search_entry_item( search_for):
+	if isinstance(search_for, KalturaESearchEntryOperator):
+		return _repr_search_operator(search_for)
+	op = ""
+	value = ""
+	if (search_for.itemType != KalturaESearchItemType.RANGE):
+		op = Filter.KalturaESearchItem_OPERATOR_STR[search_for.itemType]
+		value = search_for.searchTerm
+	elif (search_for.range):
+		op_value = vars(search_for.range)
+		for rop in op_value.keys():
+			if op_value[rop] != NotImplemented:
+				op +=  "(%s %s) " % (rop, op_value[rop])
+	return ("%s %s %s" % (str(search_for.fieldName), op, str(value))).strip()
+
+
+def _years_ago(years):
+	"""
+	:param years: number of years
+	:return: return   unix standard time of now() - years
+
+	"""
+	if (years is not None):
+		d = datetime.now() - relativedelta(years=years)
+		return int(calendar.timegm(d.utctimetuple()))
+	else:
+		return None
+
+def _kaltura_search_entry(field, op, value):
+	search_for = KalturaESearchEntryItem()  # type: KalturaESearchEntryItem
+	search_for.fieldName = field
+	search_for.itemType = op
+	if op == KalturaESearchItemType.RANGE:
+		search_for.range = value
+	else:
+		search_for.searchTerm = value
+	return search_for
 
 
 class FilterIter:
-    PAGER_CHUNK = 500
+	def __init__(self, filter):
+		self.filter = filter
+		self.pager = KalturaPager()
+		self.pager.pageSize = filter.per_page
+		self.pager.pageIndex = filter.page - 1
+		self.max_iter = filter.maximum_iter
+		self._next_batch()
 
-    def __init__(self, filter):
-        self.filter = filter
-        self.pager = KalturaFilterPager()
-        self.pager.pageSize = filter.per_page
-        self.pager.pageIndex = filter.page -1
-        self.max_iter = filter.maximum_iter
-        self._next_batch()
+	def next(self):
+		if (self.max_iter == 0):
+			raise StopIteration()
+		n = None
+		try:
+			n = self._next()
+		except StopIteration as stp:
+			self._next_batch()
+			n = self._next()
+		api.logger.debug("Filter.next -> %s" % n.getId())
+		return n
 
+	def _next_batch(self):
+		self.pager.setPageIndex(self.pager.getPageIndex() + 1)
+		self.last_results = api.getClient().elasticSearch.eSearch.searchEntry(self.filter.search_params, self.pager)
+		if (self.last_results.objects):
+			api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
+			self.object_iter = iter(self.last_results.objects)
+		else:
+			self.object_iter = iter([])
 
-    def next(self):
-        if (self.max_iter  == 0):
-            raise StopIteration()
-        n = None
-        try:
-            n = self._next()
-        except StopIteration as stp:
-            self._next_batch()
-            n = self._next()
-        api.logger.debug("Filter.next -> %s" % n.getId())
-        return n
-
-
-    def _next_batch(self):
-        self.pager.setPageIndex(self.pager.getPageIndex() + 1)
-        self.last_result = api.getClient().media.list(self.filter.filter, self.pager)
-        if (self.last_result.objects):
-            api.logger.debug("%s: iter page %d" % (self.filter, self.pager.getPageIndex()))
-            self.object_iter = iter(self.last_result.objects)
-        else:
-            self.object_iter = iter([])
-
-    def _next(self):
-        n = next(self.object_iter)
-        self.max_iter  -= 1
-        return n;
+	def _next(self):
+		n = next(self.object_iter)
+		self.max_iter -= 1
+		return n.object

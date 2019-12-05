@@ -33,15 +33,6 @@ class TestFilterIter(TestKaltura):
 
         self.assertEqual(e.getId(), e_.getId())
 
-    def test_overlap_notPlayed(self):
-        filter = kaltura.Filter().first_page(3).page_size(5).max_iter(1).undefined_LAST_PLAYED_AT()
-        e = next(iter(filter))
-
-        filter = kaltura.Filter().first_page(2).page_size(5).max_iter(6).undefined_LAST_PLAYED_AT()
-        e_ = list(filter)[-1]
-
-        self.assertEqual(e.getId(), e_.getId())
-
     def test_overlap_SAVED_TO_S3(self):
         filter = kaltura.Filter().first_page(3).page_size(1).max_iter(1).tag(kaltura_aws.SAVED_TO_S3)
         e = next(iter(filter))

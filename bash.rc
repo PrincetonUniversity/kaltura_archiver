@@ -1,3 +1,11 @@
+# number of years to keep videoas in KMC 
+export N_YEARS=3 
+
+# to run in production 
+export DOIT=true 
+# to run in test/dryrun mode  
+export DOIT=false 
+
 # Kaltura KMC keys
 export KALTURA_PARTNERID=email
 export KALTURA_SECRET=secret

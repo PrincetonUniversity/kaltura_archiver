@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 import unittest
 
+from KalturaClient.Base import IKalturaLogger
 from  kaltura_aws import KalturaArgParser, _init_loggers
 import kaltura
 import envvars
+
 from KalturaClient.Plugins.Core import *
 import random
 import sys
@@ -19,15 +21,18 @@ class TestKaltura(unittest.TestCase):
     # assuming its OK to change stuff in the Test KMC
     # IDs below are assumed to be in the test KMC
     # if test fail follow up tests may start in unexpected scenarios
-    TEST_KALTURA_PARTNER_ID = 11111
+    TEST_KALTURA_PARTNER_ID = 336061
 
-    TEST_ID_1 = '1_tza6webs'
+    TEST_ID_1 = '1_nkc7nbgs'
 
     # this image should not have an s3 copy when test are started
     TEST_ID_NO_S3_COPY = '1_z9hho4yy'
 
     # this entry has no ORIGINAL
     TEST_ID_NO_ORIGINAL = '1_cmnbl3za'
+
+    # this TAG=python_test  + other tags
+    TEST_TAG_PYTHON_TEST = '1_nkc7nbgs'
 
     @classmethod
     def setUpClass(cls):
@@ -46,11 +51,18 @@ class TestKaltura(unittest.TestCase):
             # client.config.logger = KalturaLogger()
             assert(client != None)
 
+    @classmethod
+    def tearDownClass(cls):
+            print("-- tearDownClass {}".format(cls))
+
     def setUp(self):
         self.bucket = TestKaltura.bucket
         self.place_holder_video = TestKaltura.place_holder_video
 
+# enable to see debug logging info during test execution
 #_init_loggers()
+#kaltura.logger.setLevel('DEBUG')
+
 TestKaltura.setUpClass()
 
 if __name__ == '__main__':
