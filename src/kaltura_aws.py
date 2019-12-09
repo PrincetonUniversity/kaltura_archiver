@@ -653,7 +653,7 @@ def health_check(params):
     bucket = params['awsBucket']
 
     nerror = 0
-    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.CREATED_AT_DATE]
+    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.LAST_PLAYED_DATE, kaltura.CREATED_AT_DATE, kaltura.CREATOR_ID]
     print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, 'size_match', '---'])
     for entry in filter:
         mentry = kaltura.MediaEntry(entry);
