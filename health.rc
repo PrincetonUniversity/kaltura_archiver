@@ -9,42 +9,31 @@ log=INFO
 # generate  health  report of entries that still need to be archived/restored/replaced 
 
 tsv=/tmp/$$.tsv
-echo $tmp
 
-echo "# PRINT REPORT of videos that violate expectations about their status, "
-echo "# that is about the relationship between the date they were last played and whether  "
+echo "# PRINT HEALTH REPORT of videos that violate expectations about their status, "
+echo "# that is avout the relationship between the date they were last played and whether  "
 echo "#  - they should be archived to s3  "
-echo "#  - they should be replaced with the place holder videa or have their original video in place "
+echo "#  - they should be replaced with the place holder videa an "
+echo "#  - their original video should be restored from s3  "
 echo ""
-echo "flavors_deleted <-> video is replaced with small place_holder in KMC and original stored in s3 "
-echo "archived_to_s3  <-> video's original is stored in s3"
-
 
 echo "# -------------------------------------------------------------------"
-echo "# videos played within the last $N_YEARS years that still show as flavors_deletred"
+echo "# replaced videos played in the last $N_YEARS years  - should be restored "
 echo "# -------------------------------------------------------------------"
-python src/kaltura_aws.py -l $log  list --played_within $N_YEARS             --tag 'flavors_deleted' >> $tsv
+python src/kaltura_aws.py -l $log  health --played_within $N_YEARS --tag flavors_deleted >> $tsv
 
 echo "# -------------------------------------------------------------------"
-echo "# videos unplayed in $N_YEARS years  - should have flavors_deleted tag "
+echo "# videos not played in $N_YEARS years  - should be archived and replaced  "
 echo "# -------------------------------------------------------------------"
-python src/kaltura_aws.py -l $log  list --unplayed_for $N_YEARS             --tag \!flavors_deleted  >> $tsv
-python src/kaltura_aws.py -l $log  list --created_before $N_YEARS --plays 1 --tag \!flavors_deleted  >> $tsv
+python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!archived_to_s3  >> $tsv
+python src/kaltura_aws.py -l $log  health --plays 1 --unplayed_for $N_YEARS  --tag \!flavors_deleted  >> $tsv
 
+echo "# -------------------------------------------------------------------"
+echo "# videos never played in $N_YEARS  - should be archived and replaced  "
+echo "# -------------------------------------------------------------------"
+python src/kaltura_aws.py -l $log  health --plays 1 --created_before $N_YEARS  --tag \!archived_to_s3  >> $tsv
+python src/kaltura_aws.py -l $log  health --plays 1 --created_before $N_YEARS  --tag \!flavors_deleted  >> $tsv
 
-sort -u $tsv > $tsv.sorted
-fgrep 'last_played' $tsv.sorted
-cat $tsv.sorted
-
-n=`wc -l < $tsv.sorted`
-n=$(( $n - 1 ))
-echo "#Entries in  unexptected status: " $n
-if [ $n -eq 0 ]; then
-  echo "SUCCESS"
-  exit 0
-else
-  echo "FAILURE"
-  exit 1
-fi
-
+fgrep entry_id $tsv | head -1 
+sort -u $tsv 
 
