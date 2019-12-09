@@ -247,7 +247,12 @@ class IdFileIter:
         :param file: input file descriptor
         """
         self.file = file
-        self.filter = kaltura.Filter()
+
+    def __str__(self):
+        return "IdFilter(file={})".format(self.file.name)
+
+    def __repr__(self):
+        return str(self)
 
     def __iter__(self):
         return self;
@@ -264,9 +269,9 @@ class IdFileIter:
             return self.next()
 
         # get info from kaltura
-        self.filter.entry_id(id)
         try:
-            result = next(iter(self.filter))
+            f = kaltura.Filter().entry_id(id).status(kaltura.Filter.ENTRY_ANY_STATUS)
+            result = next(iter(f))
             return result
         except StopIteration:
             kaltura.logger.warning(("No match for id '{}'".format(id)))
@@ -648,7 +653,7 @@ def health_check(params):
     bucket = params['awsBucket']
 
     nerror = 0
-    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.CREATED_AT_DATE]
+    columns = [kaltura.ORIGINAL, kaltura.ORIGINAL_STATUS, SAVED_TO_S3, PLACE_HOLDER_VIDEO, kaltura.LAST_PLAYED_DATE, kaltura.CREATED_AT_DATE, kaltura.CREATOR_ID]
     print "\t".join([kaltura.ENTRY_ID, 'status-ok'] + columns + ['s3-size', kaltura.ORIGINAL_SIZE, 'size_match', '---'])
     for entry in filter:
         mentry = kaltura.MediaEntry(entry);
