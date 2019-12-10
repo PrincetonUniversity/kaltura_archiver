@@ -1,5 +1,13 @@
 ---------------------
-How to Find alues for 
+ kaltura-api-v15.10.1
+---------------------
+implement health check  that can be run to test whether KMC backup / restore is in correct state 
+
+step 1)  clear out garbage 
+step 2)  make sure you can trigger alarm when health.rc lists too many entries that violoate status invariant 
+
+---------------------
+How to find values for 
 ---------------------
 setenv    KALTURA_PARTNERID ...
 setenv    KALTURA_SECRET ...
@@ -25,13 +33,28 @@ search for restore string
 look for funtion name stored in subparer: 
         subparser.set_defaults(func=restore_from_s3)
 
+--
+keep status invariant in place where 
+nothing is in s3 that is gone from the KMC 
 
+delete(entry_id) 
+	if (s3.entry_id exists): 
+		refuse to delete entry in KMC 
+	else; 
+		go ahead 
+
+refuse to delete if entry is in s3 (don't worry about tags - just look at s3) 
+
+
+tests: add to test_media_entry tests 
+	simply delete latest created item 
+	may want to make sure you do not delete want of the statically programmed items 
+	see test/test_kaltura_aws.py 
 
 ---------------------
 Implement filter on category 
 Revive related test case 
 ---------------------
-
 Monika asked Kalrura to senf python snippet showing how to filter by category 
 Case# 00280577: API Issue [ ref:_00D70KBCD._5000g29q6Q6:ref ]
 
