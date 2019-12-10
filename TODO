@@ -1,0 +1,51 @@
+---------------------
+How to Find alues for 
+---------------------
+setenv    KALTURA_PARTNERID ...
+setenv    KALTURA_SECRET ...
+
+log into Kaltura Console 
+Chose   New KMC Login   for   Acount 
+Click on Settings Gear upper right corner 
+Click pn 'Settings' 
+Copy-paste  PartnerId and AdminSecret 
+  
+---------------------
+Document How to Set up PyCharm
+---------------------
+pyenv show   boto3
+ln -s /the/path/... site-packages 
+mark site-packages as project sources in PyCharm
+
+---------------------
+Implement delete action
+---------------------
+TIP: see how restore  action is done  in kaltura_aws.py 
+search for restore string 
+look for funtion name stored in subparer: 
+        subparser.set_defaults(func=restore_from_s3)
+
+
+
+---------------------
+Implement filter on category 
+Revive related test case 
+---------------------
+
+Monika asked Kalrura to senf python snippet showing how to filter by category 
+Case# 00280577: API Issue [ ref:_00D70KBCD._5000g29q6Q6:ref ]
+
+Python code:
+config = KalturaConfiguration(PARTNER_ID)
+config.serviceUrl = "https://www.kaltura.com/"
+client = KalturaClient(config)
+searchParams = KalturaESearchEntryParams()
+searchParams.searchOperator = KalturaESearchEntryOperator()
+searchParams.searchOperator.searchItems = []
+searchParams.searchOperator.searchItems[0] = KalturaESearchCategoryEntryItem()
+searchParams.searchOperator.searchItems[0].searchTerm = "Mashup"
+searchParams.searchOperator.searchItems[0].itemType = int.EXACT_MATCH
+searchParams.searchOperator.searchItems[0].fieldName = string.NAME
+searchParams.searchOperator.searchItems[0].categoryEntryStatus = int.ACTIVE
+pager = None
+result = client.esearch.searchEntry(searchParams, pager)
